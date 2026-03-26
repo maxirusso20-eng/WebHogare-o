@@ -1,0 +1,3196 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Despacho — Colectas</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0e0f11;
+      --surface: #16181c;
+      --border: #2a2d35;
+      --hover-bg: #1f2228;
+      --accent: #2563eb;
+      --accent-dim: #1d4ed8;
+      --text: #e8eaed;
+      --text-muted: #6b7280;
+      --sent: #0f1c2e;
+      --sent-border: #1a4370;
+      --danger: #ff4d4d;
+      --danger-bg: #1f0e0e;
+      --radius: 10px;
+      transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    [data-theme="light"] {
+      --bg: #f9f9fb;
+      --surface: #ffffff;
+      --border: #e1e3e8;
+      --hover-bg: #eef0f3;
+      --accent: #0f62fe;
+      --accent-dim: #1c4a9c;
+      --text: #1a1d21;
+      --text-muted: #5f6368;
+      --sent: #e3f2fd;
+      --sent-border: #90caf9;
+      --danger: #ef4444;
+      --danger-bg: #fee2e2;
+      transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 999;
+      opacity: 0.4;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+      gap: 12px;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 1.1rem;
+      letter-spacing: -0.02em;
+      background: linear-gradient(to bottom, var(--text) 45%, var(--accent) 55%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      white-space: nowrap;
+    }
+
+    [data-theme="light"] .logo {
+      background: none;
+      -webkit-text-fill-color: initial;
+      color: var(--accent);
+    }
+
+    .logo span {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .btn-menu {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 1.2rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-menu:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* SIDEBAR */
+    #sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 999;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+
+    #sidebar-overlay.show {
+      display: block;
+      opacity: 1;
+    }
+
+    #sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 280px;
+      height: 100vh;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease-out;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.2);
+    }
+
+    #sidebar.open {
+      transform: translateX(0);
+    }
+
+    /* DB Table Symmetry */
+    .db-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .db-table th {
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 12px 15px;
+      border-bottom: 2px solid var(--border);
+      text-align: left;
+    }
+
+    .db-table td {
+      padding: 12px 15px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.76rem;
+    }
+
+    .db-table tr:hover td {
+      background: var(--hover-bg);
+    }
+
+    .sidebar-submenu {
+      display: none;
+      flex-direction: column;
+      padding-left: 20px;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .sidebar-submenu.show {
+      display: flex;
+    }
+
+    .nav-tab.sub {
+      font-size: 0.75rem;
+      padding: 8px 14px;
+      color: var(--text-muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .nav-tab.sub:hover {
+      color: var(--text);
+    }
+
+    .nav-tab.sub.active {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .sidebar-header {
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .btn-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .btn-close:hover {
+      color: var(--danger);
+    }
+
+    .sidebar-nav {
+      padding: 20px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .nav-tab.db-btn {
+      margin-top: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 15px;
+      padding-bottom: 15px;
+      color: var(--accent);
+    }
+
+    .nav-tab {
+      background: none;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      text-align: left;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-bottom: 2px;
+    }
+
+    .nav-tab:hover {
+      background: var(--hover-bg);
+      color: var(--text);
+      transform: translateX(4px);
+    }
+
+    .nav-tab.active {
+      background: var(--accent);
+      color: #ffffff;
+      border-color: var(--accent-dim);
+      font-weight: 600;
+    }
+
+    .sidebar-footer {
+      padding: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-theme {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      padding: 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .btn-theme:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .tab-group {
+      display: flex;
+      gap: 4px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      letter-spacing: 0.05em;
+    }
+
+    [data-theme="light"] .tab-btn.active {
+      background: #ffffff;
+      color: var(--accent);
+      border: 1px solid var(--border);
+      font-weight: 700;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: background 0.3s;
+      flex-shrink: 0;
+    }
+
+    .status-dot.ok {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .status-dot.error {
+      background: var(--danger);
+    }
+
+    .btn-sm {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-sm:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* CONFIG */
+    #config-panel {
+      max-width: 540px;
+      margin: 60px auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px;
+      animation: fadeUp 0.3s ease;
+    }
+
+    #config-panel h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.3rem;
+      margin-bottom: 6px;
+      color: var(--accent);
+    }
+
+    #config-panel p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      line-height: 1.6;
+    }
+
+    .field {
+      margin-bottom: 16px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .field input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: var(--accent);
+      color: #0e0f11;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.9rem;
+      padding: 12px;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: opacity 0.15s;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.88;
+    }
+
+    .hint {
+      margin-top: 20px;
+      padding: 14px;
+      background: var(--hover-bg);
+      border-radius: 6px;
+      border-left: 3px solid var(--accent-dim);
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .hint a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    /* PÁGINAS */
+    .page {
+      display: none;
+      padding: 24px 28px;
+    }
+
+    .page.active {
+      display: block;
+      animation: fadeUp 0.2s ease;
+    }
+
+    /* STATS */
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      flex: 1;
+      min-width: 140px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .stat:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-dim);
+    }
+
+    .stat-val {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    /* SEARCH */
+    .search-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+      align-items: center;
+    }
+
+    .search-row input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      padding: 9px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .search-row input:focus {
+      border-color: var(--accent);
+    }
+
+    /* DESPACHO CARDS */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .choferes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 12px;
+    }
+
+    .chofer-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.15s;
+      animation: fadeUp 0.25s ease both;
+    }
+
+    .chofer-card:hover {
+      border-color: var(--border);
+      filter: brightness(1.08);
+      transform: translateY(-1px);
+    }
+
+    .chofer-card.enviado {
+      border-color: var(--sent-border);
+      background: var(--sent);
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .chofer-card.enviado .card-header {
+      border-color: var(--sent-border);
+    }
+
+    .chofer-name {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.92rem;
+    }
+
+    .chofer-meta {
+      font-size: 0.66rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .badge-enviado {
+      background: var(--sent-border);
+      color: var(--accent);
+      font-size: 0.62rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.06em;
+      display: none;
+    }
+
+    .chofer-card.enviado .badge-enviado {
+      display: block;
+    }
+
+    .clientes-list {
+      padding: 10px 16px;
+      max-height: 170px;
+      overflow-y: auto;
+    }
+
+    .cliente-row {
+      padding: 5px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.74rem;
+    }
+
+    .cliente-row:last-child {
+      border-bottom: none;
+    }
+
+    .cliente-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .cliente-nombre {
+      color: var(--text);
+    }
+
+    .cliente-horario {
+      color: var(--accent-dim);
+      font-size: 0.68rem;
+      white-space: nowrap;
+    }
+
+    .cliente-dir {
+      color: var(--text-muted);
+      font-size: 0.66rem;
+      margin-top: 2px;
+    }
+
+    .card-footer {
+      padding: 10px 16px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 8px;
+    }
+
+    .chofer-card.enviado .card-footer {
+      border-color: var(--sent-border);
+    }
+
+    .btn-sm {
+      padding: 8px 14px;
+      font-size: 0.76rem;
+      border-radius: 8px;
+    }
+
+    .btn-accent {
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+    }
+
+    .btn-accent:hover {
+      opacity: 0.88;
+    }
+
+    .btn-wa {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      background: var(--accent);
+      color: #0e0f11;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.75rem;
+      padding: 9px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.15s;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-wa:hover {
+      opacity: 0.85;
+    }
+
+    .chofer-card.enviado .btn-wa {
+      background: var(--sent-border);
+      color: var(--accent);
+    }
+
+    .btn-toggle {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      padding: 9px 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-toggle:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .chofer-card.enviado .btn-toggle {
+      border-color: var(--sent-border);
+      color: var(--accent-dim);
+    }
+
+    /* TABLA CLIENTES */
+    .clientes-table-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .clientes-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    .clientes-table th {
+      background: var(--surface);
+      color: var(--text-muted);
+      font-size: 0.65rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .clientes-table td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .clientes-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .clientes-table tr:hover td {
+      background: var(--hover-bg);
+    }
+
+    .clientes-table tr.editando td {
+      background: var(--hover-bg);
+    }
+
+    .td-cliente {
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .td-chofer {
+      color: var(--accent);
+    }
+
+    .td-horario {
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .td-dir {
+      color: var(--text-muted);
+      max-width: 200px;
+    }
+
+    .inp-inline {
+      background: var(--bg);
+      border: 1px solid var(--accent-dim);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      padding: 5px 9px;
+      outline: none;
+      width: 100%;
+      transition: border-color 0.15s;
+    }
+
+    .inp-inline:focus {
+      border-color: var(--accent);
+    }
+
+    .select-inline {
+      background: var(--bg);
+      border: 1px solid var(--accent-dim);
+      border-radius: 5px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      padding: 5px 9px;
+      outline: none;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .select-inline option {
+      background: var(--surface);
+    }
+
+    .td-acciones {
+      white-space: nowrap;
+    }
+
+    /* MODAL SEGURIDAD */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    .modal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 360px;
+      overflow: hidden;
+      animation: modalIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    @keyframes modalIn {
+      from {
+        transform: translateY(40px) scale(0.9);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+      }
+    }
+
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .inp-admin {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 1.2rem;
+      text-align: center;
+      letter-spacing: 6px;
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .inp-admin:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+
+    .btn-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.4rem;
+      padding: 0 5px;
+    }
+
+    .admin-menu-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .btn-admin-opt {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+      padding: 15px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      color: var(--text);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+    }
+
+    .btn-admin-opt:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent);
+      background: var(--hover-bg);
+    }
+
+    .btn-admin-opt strong {
+      display: block;
+      font-size: 0.95rem;
+      margin-bottom: 2px;
+    }
+
+    .btn-admin-opt small {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .btn-admin-opt.danger:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .btn-admin-opt.danger:hover small {
+      color: #ef4444;
+      opacity: 0.7;
+    }
+
+    .btn-del-zona {
+      background: #5a1f1f;
+      color: #fff;
+      border: none;
+      padding: 4px 10px;
+      font-size: 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    .btn-del-zona:hover {
+      background: #7a2a2a;
+    }
+
+    .btn-del {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .btn-del:hover {
+      color: var(--danger);
+    }
+
+    .btn-edit {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-edit:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-save {
+      background: var(--accent);
+      color: #0e0f11;
+      border: none;
+      border-radius: 5px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.68rem;
+      padding: 5px 10px;
+      cursor: pointer;
+      margin-right: 4px;
+      transition: opacity 0.15s;
+    }
+
+    .btn-save:hover {
+      opacity: 0.85;
+    }
+
+    .btn-cancel {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      padding: 5px 10px;
+      cursor: pointer;
+    }
+
+    .btn-cancel:hover {
+      border-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .saving-lbl {
+      display: inline-block;
+      font-size: 0.65rem;
+      color: var(--accent-dim);
+      margin-left: 6px;
+      animation: pulse 1s infinite;
+    }
+
+    /* LOADING / ERROR */
+    #loading {
+      display: none;
+      text-align: center;
+      padding: 80px 0;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+    }
+
+    .spinner {
+      width: 30px;
+      height: 30px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto 14px;
+    }
+
+    #error-msg {
+      display: none;
+      max-width: 480px;
+      margin: 40px auto;
+      background: var(--danger-bg);
+      border: 1px solid #5a1f1f;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      color: #ff8080;
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 50px 0;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    /* TOAST */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 11px 16px;
+      font-size: 0.76rem;
+      color: var(--text);
+      z-index: 500;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: all 0.2s;
+      pointer-events: none;
+    }
+
+    #toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #toast.ok {
+      border-color: var(--sent-border);
+      color: var(--accent);
+    }
+
+    #toast.err {
+      border-color: #5a1f1f;
+      color: #ff8080;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0)
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg)
+      }
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .4
+      }
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    /* RECORRIDOS */
+    .recorridos-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .recorridos-header h2 {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+
+    .rec-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .btn-add-zona {
+      background: var(--accent);
+      color: #0e0f11;
+      border: none;
+      border-radius: 6px;
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 0.72rem;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+
+    .btn-add-zona:hover {
+      opacity: 0.85;
+    }
+
+    .btn-export-rec {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.72rem;
+      padding: 7px 14px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .btn-export-rec:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .zona-block {
+      margin-bottom: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      animation: fadeUp 0.2s ease;
+    }
+
+    .zona-title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      background: var(--hover-bg);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .zona-name-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--accent);
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 0.82rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .zona-name-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .btn-add-row {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 5px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.66rem;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-add-row:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .btn-del-zona {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+
+    .btn-del-zona:hover {
+      color: var(--danger);
+    }
+
+    .rec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.76rem;
+    }
+
+    .rec-table th {
+      background: var(--hover-bg);
+      color: var(--text-muted);
+      font-size: 0.62rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 8px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    .rec-table td {
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+
+    .rec-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .rec-table tr:hover td {
+      background: var(--hover-bg);
+    }
+
+    .rec-inp {
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.76rem;
+      width: 100%;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: background 0.15s;
+    }
+
+    .rec-inp:focus {
+      background: var(--bg);
+      outline: 1px solid var(--accent-dim);
+    }
+
+    .rec-inp.chofer-nombre {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    .rec-inp.id-chofer {
+      color: var(--text-muted);
+      width: 60px;
+    }
+
+    .rec-check {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .td-check {
+      text-align: center;
+      width: 70px;
+    }
+
+    .btn-del-row {
+      background: none;
+      border: none;
+      color: transparent;
+      cursor: pointer;
+      font-size: 0.8rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+
+    .rec-table tr:hover .btn-del-row {
+      color: var(--text-muted);
+    }
+
+    .btn-del-row:hover {
+      color: var(--danger) !important;
+    }
+
+    /* DRAG & DROP RECORRIDOS */
+    .drag-handle {
+      cursor: grab;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      padding: 0 6px;
+      user-select: none;
+      opacity: 0.35;
+      transition: opacity 0.15s;
+      line-height: 1;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    tr[draggable="true"]:hover .drag-handle,
+    .drag-handle:hover {
+      opacity: 1;
+      color: var(--accent);
+    }
+
+    tr[draggable="true"].dragging {
+      opacity: 0.4;
+      background: var(--hover-bg) !important;
+    }
+
+    .zona-tbody.drag-over {
+      outline: 2px dashed var(--accent);
+      outline-offset: -2px;
+      background: rgba(200, 241, 53, 0.04);
+    }
+
+    .zona-tbody tr.drop-indicator {
+      height: 3px;
+      background: var(--accent);
+      pointer-events: none;
+    }
+
+    /* RESPONSIVE MOBILE */
+    @media (max-width: 600px) {
+      header {
+        flex-wrap: wrap;
+        padding: 10px 14px;
+        gap: 8px;
+      }
+
+      .logo {
+        font-size: 0.95rem;
+      }
+
+      .tab-group {
+        order: 3;
+        width: 100%;
+        justify-content: center;
+      }
+
+      .header-right {
+        margin-left: auto;
+      }
+
+      .choferes-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="sidebar-overlay" onclick="toggleMenu()"></div>
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">Hogareño</div>
+      <button class="btn-close" onclick="toggleMenu()">✕</button>
+    </div>
+    <div class="sidebar-nav" id="sidebar-nav">
+      <button class="nav-tab active" onclick="irA('despacho')">🚛 Despacho</button>
+      <button class="nav-tab" onclick="irA('clientes')">👥 Clientes</button>
+      <button class="nav-tab" onclick="irA('recorridos')">🗺️ Recorridos</button>
+      <button class="nav-tab" onclick="irA('colectas')">🕒 Colectas</button>
+      <button class="nav-tab db-btn" onclick="abrirSeguridad()">🗄️ Base de Datos</button>
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-theme" onclick="toggleTheme()" id="btn-theme">☀️ Modo Claro</button>
+    </div>
+  </aside>
+
+  <header>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button id="btn-menu" class="btn-menu" onclick="toggleMenu()" style="display:none">☰ Menú</button>
+      <div class="logo">Logistica Hogareño</div>
+    </div>
+
+    <div class="tab-group" id="tab-group" style="display:none">
+      <button class="tab-btn active" onclick="cambiarHoja('DESPACHO_FINAL')">SEMANA</button>
+      <button class="tab-btn" onclick="cambiarHoja('DESPACHO_SABADO_FINAL')">SÁBADO</button>
+    </div>
+
+    <div class="header-actions">
+      <div id="status-dot" class="status-dot"></div>
+      <button id="btn-reload" class="btn-sm" onclick="recargarPagina()" style="display:none">↻ Actualizar</button>
+    </div>
+  </header>
+
+  <!-- CONFIG -->
+
+  <!-- MODAL DE SEGURIDAD -->
+  <div id="modal-seguridad" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 style="margin:0; font-size: 1rem; font-family:'Syne',sans-serif;">Acceso Administrativo</h3>
+        <button onclick="cerrarSeguridad()" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body" style="text-align: center;">
+        <p style="margin-bottom: 20px; color: var(--text-muted); font-size: 0.8rem;">Contraseña requerida para gestionar
+          datos y configuración.</p>
+        <input type="password" id="admin-pass-inp" class="inp-admin" placeholder="••••••••"
+          onkeyup="if(event.key==='Enter') validarAccesoAdmin()">
+        <button onclick="validarAccesoAdmin()" class="btn-primary"
+          style="width: 100%; margin-top: 10px; height: 48px;">Entrar →</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="page-overlay" class="page-overlay"></div>
+
+  <!-- PANEL DE ADMINISTRACIÓN (REEMPLAZA AL CONFIG-PANEL) -->
+  <div id="page-admin" class="page" style="max-width: 480px; margin: 40px auto; padding: 24px;">
+    <h1
+      style="color:var(--accent); font-family:'Syne',sans-serif; margin-bottom: 24px; text-align: center; font-size: 1.5rem;">
+      🛡️ Administración</h1>
+
+    <div class="admin-menu-grid">
+      <button class="btn-admin-opt" onclick="irA('db-choferes')">
+        <span style="font-size: 1.5rem;">📂</span>
+        <div>
+          <strong>Base de Datos Choferes</strong>
+          <small>Ver, editar y agregar nuevos conductores</small>
+        </div>
+      </button>
+
+      <button class="btn-admin-opt" onclick="toggleConfigInputs()">
+        <span style="font-size: 1.5rem;">⚙️</span>
+        <div>
+          <strong>Conexión Sheets</strong>
+          <small>Modificar IDs de planillas y URL del macro</small>
+        </div>
+      </button>
+
+      <button class="btn-admin-opt danger" onclick="resetConfig()">
+        <span style="font-size: 1.5rem;">🗑️</span>
+        <div>
+          <strong>Borrar Configuración</strong>
+          <small>Eliminar todos los datos guardados en este navegador</small>
+        </div>
+      </button>
+    </div>
+
+    <!-- Sección de inputs técnicos (ahora secundaria) -->
+    <div id="admin-config-technical"
+      style="display:none; margin-top: 30px; border-top: 1px solid var(--border); padding-top: 25px;">
+      <h3
+        style="font-size: 0.85rem; color:var(--text-muted); margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">
+        ⚙️ Ajustes Técnicos</h3>
+
+      <div class="input-group">
+        <label>ID Planilla Base (Recorridos/Colectas)</label>
+        <input type="text" id="inp-sheet-id" placeholder="1QFuIRe3PDc6WiVXIHEWT1Trc1ziH5lBgHDkvG8mJu6A">
+      </div>
+      <div class="input-group">
+        <label>ID Planilla Despachos (Vieja)</label>
+        <input type="text" id="inp-sid-rec" placeholder="140yHhZ6yOsqa-0L-Fu_G8ufDjNR0tSuscRgw2dJ5OzY">
+      </div>
+      <div class="input-group">
+        <label>API Key de Google</label>
+        <input type="text" id="inp-api-key" placeholder="AIzaSy...">
+      </div>
+      <div class="input-group">
+        <label>URL del Apps Script Web App</label>
+        <input type="text" id="inp-apps-url" placeholder="https://script.google.com/macros/s/...">
+      </div>
+      <button class="btn-primary" onclick="guardarConfig()" style="width: 100%; margin-top: 10px;">Guardar Cambios
+        →</button>
+
+      <div class="hint" style="margin-top: 20px;">
+        <strong style="color:var(--text)">Ayuda:</strong> Podés encontrar el ID en la URL del Excel, entre
+        <code>/d/</code> y <code>/edit</code>.
+      </div>
+    </div>
+
+  </div>
+  </div>
+
+  <div id="loading">
+    <div class="spinner"></div>Cargando...
+  </div>
+  <div id="error-msg"></div>
+
+  <!-- DESPACHO -->
+  <div class="page" id="page-despacho">
+    <div class="stats-bar">
+      <div class="stat">
+        <div class="stat-val" id="stat-total">—</div>
+        <div class="stat-label">Choferes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-enviados">—</div>
+        <div class="stat-label">Enviados</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-clientes">—</div>
+        <div class="stat-label">Clientes</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-pendientes">—</div>
+        <div class="stat-label">Pendientes</div>
+      </div>
+    </div>
+    <div class="search-row">
+      <input type="text" id="search-despacho" placeholder="Buscar chofer..." oninput="filtrarChoferes()">
+      <button class="btn-sm" id="btn-marcar-todos" onclick="toggleMarcarTodos()">✓ Marcar todos</button>
+    </div>
+    <div class="choferes-grid" id="choferes-grid"></div>
+    <div class="empty-state" id="empty-despacho" style="display:none">No hay choferes para mostrar.</div>
+  </div>
+
+  <!-- CLIENTES -->
+  <div class="page" id="page-clientes">
+    <div class="search-row">
+      <input type="text" id="search-clientes" placeholder="Buscar cliente o chofer..." oninput="filtrarClientes()">
+      <button class="btn-sm btn-accent" onclick="agregarChofer()">+ Nuevo Cliente</button>
+    </div>
+    <div class="clientes-table-wrap">
+      <table class="clientes-table">
+        <thead>
+          <tr>
+            <th>CLIENTE</th>
+            <th>CHOFER</th>
+            <th>CELULAR</th>
+            <th>HORARIO</th>
+            <th>DIRECCIÓN</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-clientes">
+          <tr>
+            <td colspan="5" class="empty-state">Cargando...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RECORRIDOS -->
+  <div class="page" id="page-recorridos">
+    <div class="recorridos-header">
+      <h2>🗺️ Hoja de Recorridos</h2>
+      <div class="rec-actions">
+        <button class="btn-sm btn-accent" onclick="agregarLocalidad()">+ Nueva Localidad</button>
+      </div>
+    </div>
+    <div class="tab-group" id="rec-tab-group" style="margin-bottom: 20px;">
+      <button class="tab-btn active" onclick="cambiarHojaRecorrido('HOJA DE RECORRIDO')">SEMANA</button>
+      <button class="tab-btn" onclick="cambiarHojaRecorrido('HOJA DE RECORRIDOS SABADOS')">SÁBADO</button>
+    </div>
+    <div id="recorridos-container"></div>
+  </div>
+
+  <!-- COLECTAS -->
+  <div class="page" id="page-colectas">
+    <div class="search-row">
+      <input type="text" id="search-colectas" placeholder="Buscar cliente o chofer..." oninput="filtrarColectas()">
+    </div>
+    <div class="clientes-table-wrap">
+      <table class="clientes-table">
+        <thead>
+          <tr>
+            <th>CLIENTE</th>
+            <th>CHOFER</th>
+            <th>CELULAR</th>
+            <th style="width:80px;text-align:center">COLEC.</th>
+            <th style="width:100px;text-align:center">HORA</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-colectas">
+          <tr>
+            <td colspan="6" class="empty-state">Cargando...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BASE DE DATOS CHOFERES (PROTEGIDA) -->
+  <div class="page" id="page-db-choferes">
+    <div class="recorridos-header">
+      <h2>📂 Base de Datos de Choferes</h2>
+      <div class="rec-actions">
+        <button id="btn-new-db" class="btn-sm btn-accent" onclick="agregarFilaDB()" style="display:none">+ Nuevo
+          Registro</button>
+        <button class="btn-sm" onclick="irA('despacho')">Cerrar</button>
+      </div>
+    </div>
+    <div class="search-row">
+      <input type="text" id="search-db-choferes" placeholder="Buscar chofer o DNI..." oninput="filtrarDB()">
+    </div>
+    <div class="clientes-table-wrap">
+      <table class="db-table">
+        <thead>
+          <tr>
+            <th style="width:28px"></th>
+            <th>ID</th>
+            <th>CONDUCTOR</th>
+            <th>CELULAR</th>
+            <th>DNI</th>
+            <th>ZONA PREFERENCIAL</th>
+            <th>DIRECCIÓN</th>
+            <th>FECHA INGRESO</th>
+            <th>ACTIVO</th>
+            <th>ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-db">
+          <tr>
+            <td colspan="9" class="empty-state">Iniciá sesión para ver datos.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MODAL NUEVO CONDUCTOR -->
+  <div id="modal-nuevo-chofer" class="modal-overlay" style="display:none">
+    <div class="modal-card" style="max-width:420px">
+      <div class="modal-header">
+        <h3 style="margin:0;font-size:1rem;font-family:'Syne',sans-serif;">➕ Nuevo Conductor</h3>
+        <button onclick="cerrarModalNuevoChofer()" class="btn-close">✕</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;padding:20px">
+        <div class="field" style="margin:0">
+          <label>ID del Conductor *</label>
+          <input type="text" id="nc-idat" class="inp-inline" placeholder="Ej: CH001" onkeydown="if(event.key==='Enter')document.getElementById('nc-nom').focus()">
+        </div>
+        <div class="field" style="margin:0">
+          <label>Nombre Completo *</label>
+          <input type="text" id="nc-nom" class="inp-inline" placeholder="Apellido, Nombre" onkeydown="if(event.key==='Enter')document.getElementById('nc-cel').focus()">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div class="field" style="margin:0">
+            <label>Celular</label>
+            <input type="text" id="nc-cel" class="inp-inline" placeholder="11xxxxxxxx">
+          </div>
+          <div class="field" style="margin:0">
+            <label>DNI</label>
+            <input type="text" id="nc-dni" class="inp-inline" placeholder="xxxxxxxx">
+          </div>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Zona Preferencial</label>
+          <input type="text" id="nc-zon" class="inp-inline" placeholder="Ej: ZONA NORTE">
+        </div>
+        <div class="field" style="margin:0">
+          <label>Dirección de Domicilio</label>
+          <input type="text" id="nc-dir" class="inp-inline" placeholder="Calle Nº, Localidad">
+        </div>
+        <div class="field" style="margin:0">
+          <label>Fecha de Ingreso</label>
+          <input type="date" id="nc-ing" class="inp-inline">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button onclick="cerrarModalNuevoChofer()" class="btn-cancel" style="flex:1;padding:10px">Cancelar</button>
+          <button onclick="confirmarNuevoChofer()" class="btn-save" style="flex:2;padding:10px;font-size:0.82rem">✓ Guardar Conductor</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // ══════════════════════════════════════
+    // ESTADO
+    // ══════════════════════════════════════
+    const S = {
+      config: null,
+      pagina: 'despacho',
+      hojaDespacho: 'DESPACHO_FINAL',
+      hojaRecorridos: 'HOJA DE RECORRIDO',
+      choferes: [],
+      enviados: new Set(),
+      clientes: [],
+      clientesFiltrados: [],
+      colectas: [],
+      colectasFiltradas: [],
+      choferesBD: [],
+      choferesBDFull: [],
+      dbChoferes: [],
+      dbChoferesFiltrados: [],
+      editando: null,
+      dbAutenticado: false
+    };
+
+    // ══════════════════════════════════════
+    // CONFIG & SEGURIDAD
+    // ══════════════════════════════════════
+    function abrirSeguridad() {
+      if (S.dbAutenticado) {
+        irA('admin');
+        return;
+      }
+      document.getElementById('modal-seguridad').style.display = 'flex';
+      document.getElementById('admin-pass-inp').focus();
+    }
+
+    function cerrarSeguridad() {
+      document.getElementById('modal-seguridad').style.display = 'none';
+      document.getElementById('admin-pass-inp').value = '';
+    }
+
+    function validarAccesoAdmin() {
+      const inp = document.getElementById('admin-pass-inp');
+      if (inp.value === 'Logistica2026') {
+        S.dbAutenticado = true;
+        cerrarSeguridad();
+        irA('db-choferes');
+        const btn = document.getElementById('btn-new-db');
+        if (btn) btn.style.display = 'inline-block';
+        // Carga automática inmediata
+        cargarDB();
+        toast('🔐 Acceso Concedido', 'ok');
+      } else {
+        toast('❌ Contraseña Incorrecta', 'err');
+        inp.value = '';
+        inp.focus();
+      }
+    }
+
+    function cerrarAdmin() {
+      irA('despacho');
+    }
+
+    function toggleConfigInputs() {
+      const el = document.getElementById('admin-config-technical');
+      el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function guardarConfig() {
+      const sheetId = document.getElementById('inp-sheet-id').value.trim();
+      const apiKey = document.getElementById('inp-api-key').value.trim();
+      const appsUrl = document.getElementById('inp-apps-url').value.trim();
+      const sheetIdRec = document.getElementById('inp-sid-rec')?.value.trim() || '';
+      if (!sheetId || !apiKey) return alert('Completá ID de planilla y API Key.');
+      localStorage.setItem('col_sid', sheetId);
+      localStorage.setItem('col_key', apiKey);
+      localStorage.setItem('col_url', appsUrl);
+      localStorage.setItem('col_sid_rec', sheetIdRec);
+      toast('✓ Configuración Guardada', 'ok');
+      iniciar();
+    }
+
+    function resetConfig() {
+      if (!confirm('¿Borrar TODA la configuración y datos locales? Se perderá la conexión con las planillas.')) return;
+      ['col_sid', 'col_key', 'col_url', 'col_sid_rec', 'col_last_page', 'col_hoja', 'col_hoja_rec', 'col_theme', 'col_cli_overrides'].forEach(k => localStorage.removeItem(k));
+      location.reload();
+    }
+
+    function cargarEnviados() {
+      try {
+        const saved = JSON.parse(localStorage.getItem('col_enviados_' + S.hojaDespacho) || '[]');
+        S.enviados = new Set(saved);
+      } catch (e) { S.enviados = new Set(); }
+    }
+
+    function persistirEnviados() {
+      localStorage.setItem('col_enviados_' + S.hojaDespacho, JSON.stringify([...S.enviados]));
+    }
+
+    function iniciar() {
+      const sheetId = localStorage.getItem('col_sid');
+      const apiKey = localStorage.getItem('col_key');
+      const sheetIdRec = localStorage.getItem('col_sid_rec') || sheetId;
+      if (!sheetId || !apiKey) {
+        irA('admin');
+        document.getElementById('admin-config-technical').style.display = 'block';
+        return;
+      }
+      S.config = { sheetId, apiKey, appsUrl: localStorage.getItem('col_url') || '', sheetIdRec };
+
+      // Restaurar estado previo
+      S.hojaDespacho = localStorage.getItem('col_hoja') || 'DESPACHO_FINAL';
+      S.hojaRecorridos = localStorage.getItem('col_hoja_rec') || 'HOJA DE RECORRIDO';
+      // Siempre arrancar en Despacho al cargar la app
+      const lastPage = 'despacho';
+
+      cargarEnviados();
+      const cp = document.getElementById('config-panel');
+      if (cp) cp.style.display = 'none';
+
+      const sn = document.getElementById('sidebar-nav');
+      if (sn) sn.style.display = 'flex';
+      const bm = document.getElementById('btn-menu');
+      if (bm) bm.style.display = 'flex';
+      const br = document.getElementById('btn-reload');
+      if (br) br.style.display = 'block';
+      const bc = document.getElementById('btn-config');
+      if (bc) bc.style.display = 'block';
+      aplicarTemaGuardado();
+      irA(lastPage);
+    }
+
+    // ══════════════════════════════════════
+    // RECORRIDOS
+    // ══════════════════════════════════════
+    // ══════════════════════════════════════
+    // RECORRIDOS
+    // ══════════════════════════════════════
+
+    // ══════════════════════════════════════
+    // ALTAS (NUEVOS REGISTROS)
+    // ══════════════════════════════════════
+    async function agregarChofer() {
+      const nombre = prompt("Nombre del Chofer:");
+      if (!nombre) return;
+      const tel = prompt("Teléfono (sin espacios, ej: 1112345678):");
+      if (!tel) return;
+
+      if (!confirm(`¿Agregar a ${nombre} con tel ${tel}?`)) return;
+
+      if (S.config.appsUrl) {
+        toast('Guardando chofer...', 'info');
+        const idPar = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+        const url = `${S.config.appsUrl}?action=addChofer&nombre=${encodeURIComponent(nombre)}&tel=${encodeURIComponent(tel)}${idPar}`;
+        await pingAppsScript(url);
+        toast('✓ Chofer agregado. Recargá la página.', 'ok');
+        cargarClientes(); // Recargar lista
+      }
+    }
+
+    async function agregarLocalidad() {
+      const loc = prompt("Nombre de la Localidad/Zona:");
+      if (!loc) return;
+
+      const idPar = S.config.sheetIdRec ? `&docid=${S.config.sheetIdRec}` : '';
+      const url = `${S.config.appsUrl}?action=addRecorrido&sheet=${enc(S.hojaRecorridos)}&localidad=${encodeURIComponent(loc)}${idPar}`;
+
+      toast('Guardando localidad...', 'info');
+      await pingAppsScript(url);
+      toast('✓ Localidad agregada.', 'ok');
+      renderRecorridos(); // Recargar vista
+    }
+
+    function recDefaultData() {
+      return [];
+    }
+
+    async function cargarRecorridos() {
+      if (!S.config) return [];
+      try {
+        const { sheetId, apiKey } = S.config; // Nueva planilla para recorridos
+        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${enc(S.hojaRecorridos)}?key=${apiKey}`);
+        if (!r.ok) throw new Error("Error leyendo hoja");
+        const rows = (await r.json()).values || [];
+
+        const zonasMap = {};
+        let currentZona = 'GENERAL';
+
+        function clasificar(nom, override) {
+          if (override) return override;
+          if (!nom) return null;
+          const n = nom.toUpperCase();
+          // OESTE
+          if (n.includes('SAN MIGUEL') || n.includes('3 DE FEBRERO') || n.includes('MORON') || n.includes('TESEI') || n.includes('RAMOS') || n.includes('LUZURIAGA') || n.includes('SAN JUSTO') || n.includes('HAEDO') || n.includes('MATANZA') || n.includes('FERRERE') || n.includes('MERLO') || n.includes('MARCOS PAZ') || n.includes('PADUA') || n.includes('MORENO') || n.includes('LUJAN') || n.includes('ITUZAINGO') || n.includes('FEBRERO') || n.includes('OESTE')) return 'ZONA OESTE';
+          // SUR
+          if (n.includes('GLEW') || n.includes('LONGCHAMPS') || n.includes('GUERNICA') || n.includes('SAN VICENTE') || n.includes('LA PLATA') || n.includes('BERAZATEGUI') || n.includes('QUILMES') || n.includes('LOMAS') || n.includes('AVELLANEDA') || n.includes('LANUS') || n.includes('VARELA') || n.includes('BROWN') || n.includes('EZEIZA') || n.includes('CAÑUELAS') || n.includes('ESTEBAN ECHEVERRIA') || n.includes('9 DE ABRIL') || n.includes('SUR')) return 'ZONA SUR';
+          // NORTE
+          if (n.includes('CARDALES') || n.includes('ZARATE') || n.includes('CAMPANA') || n.includes('ESCOBAR') || n.includes('LOMA VERDE') || n.includes('MASCHWITZ') || n.includes('DIQUE') || n.includes('NORDELTA') || n.includes('TIGRE') || n.includes('SAN ISIDRO') || n.includes('VTE LOPEZ') || n.includes('SAN FERNANDO') || n.includes('MUNRO') || n.includes('BOULOGNE') || n.includes('TORCUATO') || n.includes('DEL VISO') || n.includes('VILLA ROSA') || n.includes('PILAR') || n.includes('JOSE C PAZ') || n.includes('DERQUI') || n.includes('MALVINAS') || (n.includes('SAN MARTIN') && !n.includes('AV SAN MARTIN')) || n.includes('NORTE')) return 'ZONA NORTE';
+          // CABA
+          if (n.includes('AV SAN MARTIN') || n.includes('25 DE MAYO') || n.includes('ABAJO') || n.includes('ARRIBA') || n.includes('JUAN B JUSTO') || n.includes('LUGANO') || n.includes('BOYACA') || n.includes('LA BOCA') || n.includes('BARRACAS') || n.includes('PUERTO MADERO') || n.includes('RETIRO') || n.includes('VERSALLES') || n.includes('SAAVEDRA') || n.includes('TURNO 2') || n.includes('COMODIN') || n.includes('CABA')) return 'CABA';
+
+          return null;
+        }
+
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          const colB = r[1]?.toString().trim() || '';
+          const colC = r[2]?.toString().trim() || '';
+          const colD = r[3]?.toString().trim() || '';
+          const colE = r[4]?.toString().toUpperCase() === 'TRUE';
+          const colF = r[5]?.toString().toUpperCase() === 'TRUE';
+          const colG = r[6]?.toString().trim() || ''; // Columna G: Override de zona
+
+          const bUpper = colB.toUpperCase();
+
+          if ((bUpper.includes('ZONA') || bUpper.includes('CABA')) && !colD) {
+            currentZona = colB;
+            continue;
+          }
+
+          if (!colB && !colC && !colD) continue;
+
+          const zonaAuto = clasificar(colB, colG);
+          let zonaFinal = currentZona;
+          if (zonaAuto && (currentZona === 'GENERAL' || currentZona === 'OTRA ZONA')) {
+            zonaFinal = zonaAuto;
+          }
+
+          if (!zonasMap[zonaFinal]) zonasMap[zonaFinal] = { id: i, nombre: zonaFinal, filas: [] };
+
+          zonasMap[zonaFinal].filas.push({
+            id: i + 1,
+            localidad: colB,
+            idChofer: colC,
+            nombreChofer: colD,
+            colecta: colE,
+            colectan: colF
+          });
+        }
+        return Object.values(zonasMap);
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
+    }
+
+    async function eliminarRecorridoFila(rowIndex) {
+      if (!confirm('¿Borrar esta fila?')) return;
+      if (S.config.appsUrl) {
+        const idPar = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+        toast('Borrando...', 'info');
+        await pingAppsScript(`${S.config.appsUrl}?action=deleteRow&sheet=${enc(S.hojaRecorridos)}&row=${rowIndex}${idPar}`);
+        toast('✓ Borrado. Recargando...', 'ok');
+        renderRecorridos();
+      }
+    }
+
+    async function eliminarZona(nombre, ids) {
+      if (!confirm(`¿Borrar TODAS las localidades de ${nombre}?`)) return;
+      if (S.config.appsUrl) {
+        const idPar = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+        toast('Borrando zona...', 'info');
+        // Borramos de atrás para adelante para no romper los índices
+        const sortedIds = ids.sort((a, b) => b - a);
+        for (const rid of sortedIds) {
+          await pingAppsScript(`${S.config.appsUrl}?action=deleteRow&sheet=${enc(S.hojaRecorridos)}&row=${rid}${idPar}`);
+        }
+        toast('✓ Zona eliminada.', 'ok');
+        renderRecorridos();
+      }
+    }
+
+    async function guardarRecorridoFila(rowIndex, field, value) {
+      // Guardado local visual ya se hace en oninput/onchange
+      if (S.config.appsUrl) {
+        const valEnv = typeof value === 'boolean' ? value : encodeURIComponent(value);
+        const docidEnv = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+        pingAppsScript(`${S.config.appsUrl}?action=updateRecorridoFila&sheet=${enc(S.hojaRecorridos)}&row=${rowIndex}&field=${field}&value=${valEnv}${docidEnv}`);
+      }
+    }
+
+    async function guardarTodoRecorridoLocal() {
+      // Solo para lectura rápida visual (optimistic UI), el server Source of Truth es Sheets.
+    }
+
+    async function renderRecorridos() {
+      cargando(true);
+      await cargarChoferesBDSiNecesario();
+      const zonas = await cargarRecorridos();
+      const cont = document.getElementById('recorridos-container');
+      cont.innerHTML = '';
+      if (zonas.length === 0) {
+        cont.innerHTML = '<div class="empty-state">No hay recorridos en esta hoja o hubo un error de conexión.</div>';
+      } else {
+        zonas.forEach(z => cont.appendChild(buildZonaEl(z)));
+        initDragDrop(cont);
+      }
+      cargando(false);
+      document.getElementById('page-recorridos').classList.add('active');
+    }
+
+    // ══════════════════════════════════════
+    // DRAG & DROP ENTRE ZONAS
+    // ══════════════════════════════════════
+    function initDragDrop(cont) {
+      let dragSrcRow = null;
+      let dragSrcTbody = null;
+
+      function onDragStart(e) {
+        dragSrcRow = this;
+        dragSrcTbody = this.closest('.zona-tbody');
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.rowid);
+      }
+
+      function onDragEnd(e) {
+        this.classList.remove('dragging');
+        dragSrcRow = null;
+        dragSrcTbody = null;
+        document.querySelectorAll('.zona-tbody.drag-over').forEach(tb => tb.classList.remove('drag-over'));
+        document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+      }
+
+      function onDragOver(e) {
+        if (!dragSrcRow) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const tbody = this;
+        tbody.classList.add('drag-over');
+
+        const afterElement = getDragAfterElement(tbody, e.clientY);
+        document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+        const indicator = document.createElement('tr');
+        indicator.className = 'drop-indicator';
+        indicator.innerHTML = '<td colspan="7"></td>';
+
+        if (afterElement) {
+          tbody.insertBefore(indicator, afterElement);
+        } else {
+          tbody.appendChild(indicator);
+        }
+      }
+
+      function onDragLeave(e) {
+        if (!this.contains(e.relatedTarget)) {
+          this.classList.remove('drag-over');
+          document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+        }
+      }
+
+      function onDrop(e) {
+        e.preventDefault();
+        if (!dragSrcRow) return;
+        const destTbody = this;
+        destTbody.classList.remove('drag-over');
+        document.querySelectorAll('.drop-indicator').forEach(el => el.remove());
+
+        const afterElement = getDragAfterElement(destTbody, e.clientY);
+        if (afterElement) {
+          destTbody.insertBefore(dragSrcRow, afterElement);
+        } else {
+          destTbody.appendChild(dragSrcRow);
+        }
+
+        const zonaOrigen = dragSrcTbody.dataset.zona || '';
+        const zonaDestino = destTbody.dataset.zona || '';
+
+        if (zonaOrigen !== zonaDestino) {
+          toast(`↕ ${zonaOrigen} → ${zonaDestino}`, 'info');
+          if (S.config && S.config.appsUrl) {
+            const rowId = dragSrcRow.dataset.rowid;
+            const docidEnv = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+            pingAppsScript(`${S.config.appsUrl}?action=updateRecorridoFila&sheet=${enc(S.hojaRecorridos)}&row=${rowId}&field=zona_manual&value=${enc(zonaDestino)}${docidEnv}`);
+          }
+        }
+      }
+
+      function getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('tr[draggable="true"]:not(.dragging)')];
+        return draggableElements.reduce((closest, child) => {
+          const box = child.getBoundingClientRect();
+          const offset = y - box.top - box.height / 2;
+          if (offset < 0 && offset > closest.offset) {
+            return { offset: offset, element: child };
+          } else {
+            return closest;
+          }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+      }
+
+      const rows = cont.querySelectorAll('tr[draggable="true"]');
+      rows.forEach(row => {
+        row.addEventListener('dragstart', onDragStart);
+        row.addEventListener('dragend', onDragEnd);
+
+        const handle = row.querySelector('.drag-handle');
+        if (handle) {
+          handle.addEventListener('mouseenter', () => row.setAttribute('draggable', true));
+          handle.addEventListener('mouseleave', () => row.removeAttribute('draggable'));
+        }
+      });
+
+      const tbodies = cont.querySelectorAll('.zona-tbody');
+      tbodies.forEach(tbody => {
+        tbody.addEventListener('dragover', onDragOver);
+        tbody.addEventListener('dragleave', onDragLeave);
+        tbody.addEventListener('drop', onDrop);
+      });
+    }
+
+    function initDragDropDB(tbody) {
+      let dragSrcRow = null;
+      function onDragStart(e) { dragSrcRow = this; this.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; }
+      function onDragOver(e) { if (e.preventDefault) e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return false; }
+      function onDragEnd() { this.classList.remove('dragging'); }
+      function onDrop(e) {
+        if (e.stopPropagation) e.stopPropagation();
+        if (dragSrcRow !== this) {
+          const allRows = [...tbody.querySelectorAll('tr')];
+          const srcIdx = allRows.indexOf(dragSrcRow);
+          const destIdx = allRows.indexOf(this);
+          if (srcIdx < destIdx) this.after(dragSrcRow); else this.before(dragSrcRow);
+          toast('↕ Orden actualizado visualmente', 'info');
+        }
+        return false;
+      }
+      tbody.querySelectorAll('tr').forEach(row => {
+        row.addEventListener('dragstart', onDragStart);
+        row.addEventListener('dragover', onDragOver);
+        row.addEventListener('dragend', onDragEnd);
+        row.addEventListener('drop', onDrop);
+        const handle = row.querySelector('.drag-handle');
+        if (handle) {
+          handle.addEventListener('mouseenter', () => row.setAttribute('draggable', true));
+          handle.addEventListener('mouseleave', () => row.removeAttribute('draggable'));
+        }
+      });
+    }
+
+    async function cargarChoferesBDSiNecesario() {
+      if (S.choferesBDFull.length > 0 || !S.config) return;
+      try {
+        const { sheetIdRec, apiKey } = S.config; // Usar el ID de Despachos (viejo) para la base de datos de choferes
+        const idToUse = sheetIdRec || S.config.sheetId; // Fallback al principal si el otro está vacío
+        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${idToUse}/values/${enc('BASE DE DATOS CHOFERES')}?key=${apiKey}`);
+        if (!r.ok) return;
+        const rows = (await r.json()).values || [];
+        S.choferesBDFull = [];
+        for (let i = 1; i < rows.length; i++) {
+          const id = rows[i][0]?.toString().trim() || '';
+          const nombre = rows[i][1]?.toString().trim();
+          if (nombre) S.choferesBDFull.push({ id, nombre });
+        }
+        S.choferesBD = [...new Set(S.choferesBDFull.map(c => c.nombre))].sort();
+      } catch (e) { /* sin conexión, continuar */ }
+    }
+
+    function getChoferesOptions(selectedNombre) {
+      const opts = S.choferesBDFull.map(c =>
+        `<option value="${x(c.nombre)}"${c.nombre === selectedNombre ? ' selected' : ''}>${x(c.nombre)}</option>`
+      ).join('');
+      return `<option value="">— Sin asignar —</option>${opts}`;
+    }
+
+    function onChoferSelect(sel, rowId) {
+      const nombre = sel.value;
+      const found = S.choferesBDFull.find(c => c.nombre === nombre);
+      const idInput = document.getElementById(`rec-id-${rowId}`);
+      if (idInput) {
+        idInput.value = found ? found.id : '';
+        guardarRecorridoFila(rowId, 'idChofer', idInput.value);
+      }
+      guardarRecorridoFila(rowId, 'nombreChofer', nombre);
+    }
+
+    function buildZonaEl(z) {
+      const div = document.createElement('div');
+      div.className = 'zona-block';
+      div.dataset.zonaid = z.id;
+      div.innerHTML = `
+        <div class="zona-title-row">
+          <input class="zona-name-input" value="${x(z.nombre)}" readonly>
+          <button class="btn-del-zona" onclick="eliminarZona('${x(z.nombre)}', ${JSON.stringify(z.filas.map(f => f.id))})" title="Eliminar zona completa">🗑️ Borrar zona</button>
+        </div>
+        <table class="rec-table">
+          <thead>
+            <tr>
+              <th style="width:28px"></th>
+              <th>LOCALIDAD</th>
+              <th>ID CHOFER</th>
+              <th>NOMBRE CHOFER</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody class="zona-tbody" data-zona="${x(z.nombre)}">
+            ${(z.filas || []).map(f => buildFilaHTML(f)).join('')}
+          </tbody>
+        </table>`;
+      return div;
+    }
+
+    function buildFilaHTML(f) {
+      const tieneOpts = S.choferesBDFull.length > 0;
+      const choferCell = tieneOpts
+        ? `<select class="select-inline rec-nombrechofer" style="font-size:0.74rem;padding:3px 8px" onchange="onChoferSelect(this,${f.id})">${getChoferesOptions(f.nombreChofer)}</select>`
+        : `<input class="rec-inp chofer-nombre rec-nombrechofer" value="${x(f.nombreChofer)}" placeholder="Nombre del chofer" onchange="guardarRecorridoFila(${f.id}, 'nombreChofer', this.value)">`;
+      return `<tr data-rowid="${f.id}" draggable="true">
+        <td style="width:28px;padding:0;text-align:center;"><span class="drag-handle" title="Arrastrar a otra zona">⠿</span></td>
+        <td><input class="rec-inp rec-localidad" value="${x(f.localidad)}" placeholder="Localidad / Zona" onchange="guardarRecorridoFila(${f.id}, 'localidad', this.value)"></td>
+        <td><input class="rec-inp id-chofer rec-idchofer" id="rec-id-${f.id}" value="${x(f.idChofer)}" placeholder="ID" onchange="guardarRecorridoFila(${f.id}, 'idChofer', this.value)"></td>
+        <td>${choferCell}</td>
+        <td><button class="btn-del" onclick="eliminarRecorridoFila(${f.id})">✕</button></td>
+      </tr>`;
+    }
+
+    function toggleMarcarTodos() {
+      const todosMarcados = S.choferes.every(c => c.enviado);
+      const nuevoEstado = !todosMarcados;
+      S.choferes.forEach(c => {
+        c.enviado = nuevoEstado;
+        if (nuevoEstado) S.enviados.add(c.nombre); else S.enviados.delete(c.nombre);
+      });
+      persistirEnviados();
+      document.querySelectorAll('.chofer-card').forEach(card => {
+        const nombre = card.dataset.nombre;
+        card.classList.toggle('enviado', nuevoEstado);
+        const btn = card.querySelector('.btn-toggle');
+        if (btn) btn.textContent = nuevoEstado ? '✓ Marcado' : 'Marcar';
+      });
+      actualizarStats();
+      const btnTodos = document.getElementById('btn-marcar-todos');
+      if (btnTodos) btnTodos.textContent = nuevoEstado ? '○ Desmarcar todos' : '✓ Marcar todos';
+      if (S.config.appsUrl) {
+        const idPar = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+        S.choferes.forEach(c => {
+          pingAppsScript(`${S.config.appsUrl}?action=setCheck&sheet=${S.hojaDespacho}&row=${c.rowIndex}&value=${nuevoEstado}${idPar}`);
+        });
+      }
+    }
+
+    // ══════════════════════════════════════
+    // NAVEGACIÓN
+    // ══════════════════════════════════════
+    function irA(pagina) {
+      if (typeof toggleMenu === 'function') toggleMenu(false);
+      S.pagina = pagina;
+      localStorage.setItem('col_last_page', pagina);
+
+      document.querySelectorAll('.nav-tab').forEach((b, i) =>
+        b.classList.toggle('active', (i === 0 && pagina === 'despacho') || (i === 1 && pagina === 'clientes') || (i === 2 && pagina === 'recorridos') || (i === 3 && pagina === 'colectas') || (i === 4 && pagina === 'db-choferes')));
+      document.getElementById('page-despacho').classList.toggle('active', pagina === 'despacho');
+      document.getElementById('page-clientes').classList.toggle('active', pagina === 'clientes');
+      document.getElementById('page-recorridos').classList.toggle('active', pagina === 'recorridos');
+      document.getElementById('page-colectas').classList.toggle('active', pagina === 'colectas');
+      document.getElementById('page-db-choferes').classList.toggle('active', pagina === 'db-choferes');
+      document.getElementById('page-admin').classList.toggle('active', pagina === 'admin');
+
+      const tg = document.getElementById('tab-group');
+      if (tg) {
+        tg.style.display = pagina === 'despacho' ? 'flex' : 'none';
+        if (pagina === 'despacho') {
+          document.querySelectorAll('#tab-group .tab-btn').forEach((b, i) =>
+            b.classList.toggle('active', (i === 0 && S.hojaDespacho === 'DESPACHO_FINAL') || (i === 1 && S.hojaDespacho !== 'DESPACHO_FINAL')));
+        }
+      }
+
+      const rtg = document.getElementById('rec-tab-group');
+      if (rtg) {
+        rtg.style.display = pagina === 'recorridos' ? 'flex' : 'none';
+        if (pagina === 'recorridos') {
+          const tbs = rtg.querySelectorAll('.tab-btn');
+          if (tbs.length >= 2) {
+            tbs[0].classList.toggle('active', S.hojaRecorridos === 'HOJA DE RECORRIDO');
+            tbs[1].classList.toggle('active', S.hojaRecorridos !== 'HOJA DE RECORRIDO');
+          }
+        }
+      }
+
+      if (pagina === 'recorridos') renderRecorridos();
+      if (pagina === 'despacho' && !S.choferes.length) cargarDespacho();
+      if (pagina === 'clientes') cargarClientes();
+      if (pagina === 'colectas') cargarColectas();
+      if (pagina === 'db-choferes' && S.dbAutenticado) cargarDB();
+    }
+
+    function cambiarHojaRecorrido(nombre) {
+      S.hojaRecorridos = nombre;
+      localStorage.setItem('col_hoja_rec', nombre);
+      const oldtbs = document.querySelectorAll('#rec-tab-group .tab-btn');
+      if (oldtbs.length) {
+        oldtbs[0].classList.toggle('active', nombre === 'HOJA DE RECORRIDO');
+        oldtbs[1].classList.toggle('active', nombre !== 'HOJA DE RECORRIDO');
+      }
+      renderRecorridos();
+    }
+
+    function recargarPagina() {
+      if (S.pagina === 'despacho') cargarDespacho();
+      else if (S.pagina === 'recorridos') renderRecorridos();
+      else if (S.pagina === 'colectas') cargarColectas();
+      else if (S.pagina === 'db-choferes') cargarDB();
+      else cargarClientes();
+    }
+
+    function cambiarHoja(nombre) {
+      S.hojaDespacho = nombre;
+      S.choferes = [];
+      localStorage.setItem('col_hoja', nombre);
+      cargarEnviados();
+      document.querySelectorAll('.tab-btn').forEach((b, i) =>
+        b.classList.toggle('active', (i === 0 && nombre === 'DESPACHO_FINAL') || (i === 1 && nombre !== 'DESPACHO_FINAL')));
+
+      cargarDespacho();
+    }
+
+    // ══════════════════════════════════════
+    // DESPACHO
+    // ══════════════════════════════════════
+    async function cargarDespacho() {
+      cargando(true);
+      try {
+        const { sheetIdRec, apiKey } = S.config; // sheetIdRec es el de Despachos (archivo viejo 140y...)
+        const r1 = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetIdRec}/values/${enc(S.hojaDespacho + '!A1:Z')}?key=${apiKey}`);
+        const r2 = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetIdRec}/values/${enc('BASE DE DATOS CHOFERES!A1:Z')}?key=${apiKey}`);
+        if (!r1.ok) throw new Error(`Status ${r1.status} al leer ${S.hojaDespacho}. Verificá el nombre de la hoja.`);
+
+        const rows = (await r1.json()).values || [];
+        const rowsBD = r2.ok ? ((await r2.json()).values || []) : [];
+        const telMap = {};
+        rowsBD.slice(1).forEach(r => {
+          const n = r[1]?.toString().trim();
+          const t = r[2]?.toString().trim();
+          if (n) telMap[n] = t;
+        });
+        S.telMap = telMap;
+
+        const mapa = {};
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          const cli = r[0]?.toString().trim();
+          const cho = r[1]?.toString().trim();
+          const hor = r[3]?.toString().trim();
+          const dir = r[4]?.toString().trim();
+          const env = r[5]?.toString().toUpperCase() === 'TRUE';
+          if (!cho || cho === '-' || cho === 'Lo traen' || !cli) continue;
+          if (!mapa[cho]) mapa[cho] = { nombre: cho, telefono: S.telMap[cho] || null, clientes: [], rowIndex: i + 1, enviado: env };
+          mapa[cho].clientes.push({ nombre: cli, horario: hor || '—', dir: dir || '' });
+          if (env) mapa[cho].enviado = true;
+        }
+
+        S.choferes = Object.values(mapa);
+        S.choferes.forEach(c => { if (S.enviados.has(c.nombre)) c.enviado = true; });
+        renderDespacho(S.choferes);
+        actualizarStats();
+        setStatus('ok');
+        cargando(false);
+        document.getElementById('page-despacho').classList.add('active');
+      } catch (err) { setStatus('error'); mostrarError(err.message); }
+    }
+
+    function renderDespacho(lista) {
+      const grid = document.getElementById('choferes-grid');
+      const empty = document.getElementById('empty-despacho');
+      grid.innerHTML = '';
+      if (!lista.length) { empty.style.display = 'block'; return; }
+      empty.style.display = 'none';
+
+      lista.forEach(c => {
+        const card = document.createElement('div');
+        card.className = 'chofer-card' + (c.enviado ? ' enviado' : '');
+        card.dataset.nombre = c.nombre;
+        const wa = buildWA(c);
+        card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <div class="chofer-name">${x(c.nombre)}</div>
+          <div class="chofer-meta">${c.clientes.length} cliente${c.clientes.length !== 1 ? 's' : ''} · ${c.telefono ? '📱 ' + fmtTel(c.telefono) : '⚠ sin teléfono'}</div>
+        </div>
+        <span class="badge-enviado">ENVIADO</span>
+      </div>
+      <div class="clientes-list">
+        ${c.clientes.map(k => `
+          <div class="cliente-row">
+            <div class="cliente-top"><span class="cliente-nombre">${x(k.nombre)}</span><span class="cliente-horario">${x(k.horario)}</span></div>
+            <div class="cliente-dir">${x(k.dir)}</div>
+          </div>`).join('')}
+      </div>
+      <div class="card-footer">
+        ${wa
+            ? `<a class="btn-wa" href="${wa}" target="_blank" onclick="marcarEnviado('${x(c.nombre)}')">
+               <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+               ENVIAR RECORRIDO
+             </a>`
+            : `<button class="btn-wa" disabled style="opacity:.4;cursor:not-allowed">⚠ Sin teléfono</button>`}
+        <button class="btn-toggle" onclick="toggleEnviado('${x(c.nombre)}')">${c.enviado ? '✓ Marcado' : 'Marcar'}</button>
+      </div>`;
+        grid.appendChild(card);
+      });
+    }
+
+    function buildWA(c) {
+      if (!c.telefono) return null;
+      const lineas = c.clientes.map(k => {
+        const horario = k.horario && k.horario !== '—' && k.horario !== '-' ? ` ${k.horario}` : '';
+        const dir = k.dir && k.dir !== '—' && k.dir !== '-' ? `\n${k.dir}` : '';
+        return `*${k.nombre}*${horario}${dir}`;
+      }).join('\n\n');
+      const msg = `¡Buenas noches! ¿Cómo andás? ¡Espero que muy bien!\nTe dejo la colecta del día de mañana. Por favor recordá ser puntual para salir temprano en recorrido. ¡Te lo agradezco mucho!\n\n${lineas}`;
+      return `https://wa.me/549${c.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+    }
+
+    function fmtTel(t) { return t.replace(/(\d{2})(\d{4})(\d{4})/, '$1 $2-$3'); }
+    function marcarEnviado(n) { setTimeout(() => toggleEnviado(n, true), 400); }
+
+    async function toggleEnviado(nombre, forzar = false) {
+      const c = S.choferes.find(k => k.nombre === nombre);
+      if (!c) return;
+      const nuevo = forzar ? true : !c.enviado;
+      c.enviado = nuevo;
+      if (nuevo) S.enviados.add(nombre); else S.enviados.delete(nombre);
+      persistirEnviados(); // guardar en localStorage
+      const card = document.querySelector(`.chofer-card[data-nombre="${nombre}"]`);
+      if (card) {
+        card.classList.toggle('enviado', nuevo);
+        const btn = card.querySelector('.btn-toggle');
+        if (btn) btn.textContent = nuevo ? '✓ Marcado' : 'Marcar';
+      }
+      actualizarStats();
+      if (S.config.appsUrl) {
+        const idPar = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+        pingAppsScript(`${S.config.appsUrl}?action=setCheck&sheet=${S.hojaDespacho}&row=${c.rowIndex}&value=${nuevo}${idPar}`);
+      }
+    }
+
+    function filtrarChoferes() {
+      const q = document.getElementById('search-despacho').value.toLowerCase();
+      renderDespacho(q ? S.choferes.filter(c => c.nombre.toLowerCase().includes(q)) : S.choferes);
+    }
+
+    function actualizarStats() {
+      const env = S.choferes.filter(c => c.enviado).length;
+      const cli = S.choferes.reduce((s, c) => s + c.clientes.length, 0);
+      document.getElementById('stat-total').textContent = S.choferes.length;
+      document.getElementById('stat-enviados').textContent = env;
+      document.getElementById('stat-clientes').textContent = cli;
+      document.getElementById('stat-pendientes').textContent = S.choferes.length - env;
+    }
+
+    // ══════════════════════════════════════
+    // CLIENTES
+    // ══════════════════════════════════════
+    async function cargarClientes() {
+      const tbody = document.getElementById('tbody-clientes');
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-state"><div class="spinner" style="margin:0 auto 10px"></div>Cargando...</td></tr>`;
+
+      try {
+        const { sheetIdRec, sheetId, apiKey } = S.config;
+        const idToUse = sheetIdRec || sheetId;
+        const [r1, r2] = await Promise.all([
+          fetch(`https://sheets.googleapis.com/v4/spreadsheets/${idToUse}/values/${enc('DESPACHO_WHATSAPP')}?key=${apiKey}`),
+          fetch(`https://sheets.googleapis.com/v4/spreadsheets/${idToUse}/values/${enc('BASE DE DATOS CHOFERES')}?key=${apiKey}`)
+        ]);
+        if (!r1.ok) {
+          const errText = await r1.text();
+          throw new Error(`Status ${r1.status}: No se encontró la hoja 'DESPACHO_WHATSAPP' o la API Key es inválida.`);
+        }
+
+        const rows = (await r1.json()).values || [];
+        const rowsBD = r2.ok ? ((await r2.json()).values || []) : [];
+
+        // Lista de choferes para el dropdown (col B de BASE DE DATOS)
+        S.choferesBD = [...new Set(
+          rowsBD.slice(1).map(r => r[1]?.toString().trim()).filter(Boolean)
+        )].sort();
+
+        S.clientes = [];
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          const nombre = r[0]?.toString().trim();
+          if (!nombre) continue;
+          S.clientes.push({
+            rowIndex: i + 1,
+            nombre,
+            chofer: r[1]?.toString().trim() || '',
+            tel: S.telMap[r[1]?.toString().trim()] || '',
+            horario: r[3]?.toString().trim() || '',
+            direccion: r[4]?.toString().trim() || ''
+          });
+        }
+
+        // Aplicar ediciones locales guardadas encima de los datos de Sheets
+        aplicarOverridesClientes();
+        S.clientesFiltrados = [...S.clientes];
+        renderClientes(S.clientesFiltrados);
+        setStatus('ok');
+      } catch (err) {
+        setStatus('error');
+        toast('❌ ' + err.message, 'err');
+        tbody.innerHTML = `<tr><td colspan="5" style="color:#ff8080;padding:20px;font-size:0.76rem">${err.message}</td></tr>`;
+      }
+    }
+
+    function renderClientes(lista) {
+      const tbody = document.getElementById('tbody-clientes');
+      tbody.innerHTML = '';
+      if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No hay clientes.</td></tr>`;
+        return;
+      }
+      lista.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.id = `row-${c.rowIndex}`;
+        tr.innerHTML = vistaFila(c);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function vistaFila(c) {
+      return `
+    <td class="td-cliente">${x(c.nombre)}</td>
+    <td class="td-chofer">${x(c.chofer) || '<span style="color:var(--text-muted)">—</span>'}</td>
+    <td class="td-horario" id="tel-row-${c.rowIndex}">${c.tel ? fmtTel(c.tel) : '<span style="color:var(--text-muted)">—</span>'}</td>
+    <td class="td-horario">${x(c.horario) || '—'}</td>
+    <td class="td-dir">${x(c.direccion) || '—'}</td>
+    <td class="td-acciones"><button class="btn-edit" onclick="editarFila(${c.rowIndex})">✏ Editar</button></td>`;
+    }
+
+    function editFila(c) {
+      const opts = S.choferesBD.map(ch =>
+        `<option value="${x(ch)}"${ch === c.chofer ? ' selected' : ''}>${x(ch)}</option>`
+      ).join('');
+      return `
+    <td class="td-cliente" style="font-weight:500">${x(c.nombre)}</td>
+    <td>
+      <select class="select-inline" id="ec-${c.rowIndex}" onchange="actualizarTelInline(${c.rowIndex}, this.value)">
+        <option value="">— sin asignar —</option>${opts}
+      </select>
+    </td>
+    <td id="tel-edit-${c.rowIndex}">${c.tel ? fmtTel(c.tel) : '—'}</td>
+    <td><input class="inp-inline" id="eh-${c.rowIndex}" value="${x(c.horario)}" placeholder="HH:MM"></td>
+    <td><input class="inp-inline" id="ed-${c.rowIndex}" value="${x(c.direccion)}" placeholder="Calle 123"></td>
+    <td class="td-acciones">
+      <button class="btn-save"   onclick="guardarFila(${c.rowIndex})">✓ Guardar</button>
+      <button class="btn-cancel" onclick="cancelarFila(${c.rowIndex})">✕</button>
+      <span class="saving-lbl"  id="sv-${c.rowIndex}" style="display:none">guardando…</span>
+    </td>`;
+    }
+
+    function editarFila(rowIndex) {
+      if (S.editando && S.editando !== rowIndex) cancelarFila(S.editando);
+      S.editando = rowIndex;
+      const c = S.clientes.find(k => k.rowIndex === rowIndex);
+      const tr = document.getElementById(`row-${rowIndex}`);
+      if (!c || !tr) return;
+      tr.classList.add('editando');
+      tr.innerHTML = editFila(c);
+      document.getElementById(`ec-${rowIndex}`)?.focus();
+    }
+
+    function cancelarFila(rowIndex) {
+      const c = S.clientes.find(k => k.rowIndex === rowIndex);
+      const tr = document.getElementById(`row-${rowIndex}`);
+      if (!c || !tr) return;
+      tr.classList.remove('editando');
+      tr.innerHTML = vistaFila(c);
+      if (S.editando === rowIndex) S.editando = null;
+    }
+
+    async function guardarFila(rowIndex) {
+      const c = S.clientes.find(k => k.rowIndex === rowIndex);
+      const tr = document.getElementById(`row-${rowIndex}`);
+      if (!c || !tr) return;
+
+      const nuevoChofer = document.getElementById(`ec-${rowIndex}`)?.value.trim() || '';
+      const nuevoHorario = document.getElementById(`eh-${rowIndex}`)?.value.trim() || '';
+      const nuevaDir = document.getElementById(`ed-${rowIndex}`)?.value.trim() || '';
+
+      // Actualizar local inmediatamente
+      c.chofer = nuevoChofer; c.horario = nuevoHorario; c.direccion = nuevaDir;
+      guardarOverrideCliente(rowIndex, nuevoChofer, nuevoHorario, nuevaDir);
+      tr.classList.remove('editando');
+      tr.innerHTML = vistaFila(c);
+      S.editando = null;
+
+      // Sincronizar con Sheets
+      if (S.config.appsUrl) {
+        try {
+          const idPar = S.config.sheetId ? `&docid=${S.config.sheetId}` : '';
+          const url = `${S.config.appsUrl}?action=updateCliente&row=${rowIndex}` +
+            `&nombre=${encodeURIComponent(c.nombre)}` +
+            `&chofer=${encodeURIComponent(nuevoChofer)}` +
+            `&horario=${encodeURIComponent(nuevoHorario)}` +
+            `&dir=${encodeURIComponent(nuevaDir)}${idPar}`;
+          await pingAppsScript(url);
+          toast('✓ Enviado a Sheets', 'ok');
+        } catch (e) {
+          toast('⚠ Guardado local. No se pudo sincronizar con Sheets.', 'err');
+        }
+      } else {
+        toast('✓ Cambio aplicado (configurá Apps Script URL para sincronizar)', 'ok');
+      }
+    }
+
+    function actualizarTelInline(rowIndex, choferNombre) {
+      const tel = S.telMap[choferNombre] || '';
+      const td = document.getElementById(`tel-edit-${rowIndex}`);
+      if (td) td.textContent = tel ? fmtTel(tel) : '—';
+      const c = S.clientes.find(k => k.rowIndex === rowIndex);
+      if (c) c.tel = tel;
+    }
+
+    function filtrarClientes() {
+      const q = document.getElementById('search-clientes').value.toLowerCase();
+      S.clientesFiltrados = q
+        ? S.clientes.filter(c => c.nombre.toLowerCase().includes(q) || c.chofer.toLowerCase().includes(q))
+        : [...S.clientes];
+      renderClientes(S.clientesFiltrados);
+    }
+
+    function pingAppsScript(url) {
+      return new Promise(resolve => {
+        const img = new Image();
+        img.onload = img.onerror = () => resolve();
+        img.src = url + '&_=' + Date.now();
+        setTimeout(resolve, 2000);
+      });
+    }
+
+    function guardarOverrideCliente(rowIndex, chofer, horario, direccion) {
+      const key = 'col_cli_overrides';
+      let overrides = {};
+      try { overrides = JSON.parse(localStorage.getItem(key) || '{}'); } catch (e) { }
+      overrides[rowIndex] = { chofer, horario, direccion };
+      localStorage.setItem(key, JSON.stringify(overrides));
+    }
+
+    function aplicarOverridesClientes() {
+      let overrides = {};
+      try { overrides = JSON.parse(localStorage.getItem('col_cli_overrides') || '{}'); } catch (e) { }
+      S.clientes.forEach(c => {
+        const ov = overrides[c.rowIndex];
+        if (ov) {
+          c.chofer = ov.chofer ?? c.chofer;
+          c.horario = ov.horario ?? c.horario;
+          c.direccion = ov.direccion ?? c.direccion;
+        }
+      });
+    }
+
+    // ══════════════════════════════════════
+    // HORARIO COLECTAS
+    // ══════════════════════════════════════
+    async function cargarColectas() {
+      const tbody = document.getElementById('tbody-colectas');
+      tbody.innerHTML = `<tr><td colspan="6" class="empty-state"><div class="spinner" style="margin:0 auto 10px"></div>Cargando Horario Colectas...</td></tr>`;
+
+      try {
+        const { sheetIdRec, sheetId, apiKey } = S.config;
+        const idToUse = sheetIdRec || sheetId;
+        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${idToUse}/values/${enc('CLIENTES')}?key=${apiKey}`);
+        if (!r.ok) throw new Error(`Status ${r.status}: No se pudo leer la hoja 'CLIENTES'.`);
+
+        const rows = (await r.json()).values || [];
+        S.colectas = [];
+        for (let i = 1; i < rows.length; i++) {
+          const r = rows[i];
+          const nombre = r[1]?.toString().trim(); // Col B (CLIENTE)
+          if (!nombre || nombre === 'CLIENTE') continue; // omit header
+          S.colectas.push({
+            rowIndex: i + 1,
+            nombre,
+            chofer: r[2]?.toString().trim() || '',       // Col C (CONDUCTORES)
+            tel: S.telMap[r[2]?.toString().trim()] || '',
+            colecta: r[3]?.toString().toUpperCase() === 'TRUE', // Col D (COLECTA checkbox)
+            horario: r[4]?.toString().trim() || ''       // Col E (HORARIO)
+          });
+        }
+        S.colectasFiltradas = [...S.colectas];
+        renderColectas(S.colectasFiltradas);
+        setStatus('ok');
+      } catch (err) {
+        setStatus('error');
+        toast('❌ ' + err.message, 'err');
+        tbody.innerHTML = `<tr><td colspan="6" style="color:#ff8080;padding:20px;font-size:0.76rem">${err.message}</td></tr>`;
+      }
+    }
+
+    function renderColectas(lista) {
+      const tbody = document.getElementById('tbody-colectas');
+      tbody.innerHTML = '';
+      if (!lista.length) {
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No hay registros en Colectas.</td></tr>`;
+        return;
+      }
+      lista.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.id = `col-row-${c.rowIndex}`;
+        tr.innerHTML = vistaFilaColectas(c);
+        tbody.appendChild(tr);
+      });
+    }
+
+    function vistaFilaColectas(c) {
+      const check = c.colecta ? 'checked' : '';
+      const horaLabel = c.horario ? `<span style="color:var(--accent);font-weight:700;">${c.horario}</span>` : '';
+
+      return `
+        <td class="td-cliente">${x(c.nombre)}</td>
+        <td class="td-chofer">${x(c.chofer) || '—'}</td>
+        <td class="td-horario">${c.tel ? fmtTel(c.tel) : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td style="text-align:center">
+          <input type="checkbox" class="rec-check" ${check} onchange="marcarLlegada(${c.rowIndex}, this)">
+        </td>
+        <td class="td-horario" id="hora-col-${c.rowIndex}">${horaLabel}</td>
+        <td class="td-acciones">
+           <button class="btn-edit" onclick="editarFilaColecta(${c.rowIndex})">✏</button>
+        </td>`;
+    }
+
+    async function marcarLlegada(rowIndex, cb) {
+      const c = S.colectas.find(k => k.rowIndex === rowIndex);
+      if (!c) return;
+
+      const isChecked = cb.checked;
+
+      let timeStr = '';
+      if (isChecked) {
+        const now = new Date();
+        const HH = String(now.getHours()).padStart(2, '0');
+        const MM = String(now.getMinutes()).padStart(2, '0');
+        timeStr = `${HH}:${MM}`;
+        if (!confirm(`¿Marcar colecta de ${c.nombre} a las ${timeStr}?`)) {
+          cb.checked = false;
+          return;
+        }
+      } else {
+        if (!confirm(`¿Desmarcar colecta de ${c.nombre}?`)) {
+          cb.checked = true;
+          return;
+        }
+      }
+
+      c.colecta = isChecked;
+      c.horario = timeStr;
+
+      // Actualizar visualmente la celda del horario
+      const tdHora = document.getElementById(`hora-col-${rowIndex}`);
+      if (tdHora) {
+        tdHora.innerHTML = timeStr ? `<span style="color:var(--accent);font-weight:700;">${timeStr}</span>` : '';
+      }
+
+      if (S.config.appsUrl) {
+        try {
+          const { sheetIdRec, sheetId } = S.config;
+          const idToUse = sheetIdRec || sheetId;
+          const idPar = idToUse ? `&docid=${idToUse}` : '';
+
+          // Actualizamos la columna D (Colec.) apuntando a 'nombreChofer' en el macro viejo
+          await pingAppsScript(`${S.config.appsUrl}?action=updateRecorridoFila&sheet=${enc('CLIENTES')}&row=${rowIndex}&field=nombreChofer&value=${isChecked}${idPar}`);
+          // Actualizamos la columna E (Horario) apuntando al nuevo campo 'horario_colecta' en el macro
+          await pingAppsScript(`${S.config.appsUrl}?action=updateRecorridoFila&sheet=${enc('CLIENTES')}&row=${rowIndex}&field=horario_colecta&value=${enc(timeStr)}${idPar}`);
+
+          toast(isChecked ? '✓ Colecta guardada' : '✓ Colecta desmarcada', 'ok');
+        } catch (e) {
+          toast('⚠ Error al sincronizar hora', 'err');
+        }
+      }
+    }
+
+    function filtrarColectas() {
+      const q = document.getElementById('search-colectas').value.toLowerCase();
+      S.colectasFiltradas = q
+        ? S.colectas.filter(c => c.nombre.toLowerCase().includes(q) || c.chofer.toLowerCase().includes(q))
+        : [...S.colectas];
+      renderColectas(S.colectasFiltradas);
+    }
+
+    function editarFilaColecta(rowIndex) {
+      if (S.editandoCol && S.editandoCol !== rowIndex) cancelarFilaColecta(S.editandoCol);
+      S.editandoCol = rowIndex;
+      const c = S.colectas.find(k => k.rowIndex === rowIndex);
+      const tr = document.getElementById(`col-row-${rowIndex}`);
+      if (!c || !tr) return;
+      tr.classList.add('editando');
+      tr.innerHTML = vistaEdicionColecta(c);
+      document.getElementById(`ec-horario-${rowIndex}`)?.focus();
+    }
+
+    function vistaEdicionColecta(c) {
+      return `
+        <td class="td-cliente">${x(c.nombre)}</td>
+        <td class="td-chofer">${x(c.chofer) || '—'}</td>
+        <td style="text-align:center">
+          <input type="checkbox" disabled ${c.colecta ? 'checked' : ''}>
+        </td>
+        <td>
+          <input class="inp-inline" id="ec-horario-${c.rowIndex}" value="${x(c.horario)}" placeholder="HH:MM">
+        </td>
+        <td class="td-acciones">
+          <button class="btn-save"   onclick="guardarFilaColecta(${c.rowIndex})">✓</button>
+          <button class="btn-cancel" onclick="cancelarFilaColecta(${c.rowIndex})">✕</button>
+        </td>`;
+    }
+
+    function cancelarFilaColecta(rowIndex) {
+      const c = S.colectas.find(k => k.rowIndex === rowIndex);
+      const tr = document.getElementById(`col-row-${rowIndex}`);
+      if (!c || !tr) return;
+      tr.classList.remove('editando');
+      tr.innerHTML = vistaFilaColectas(c);
+      if (S.editandoCol === rowIndex) S.editandoCol = null;
+    }
+
+    async function guardarFilaColecta(rowIndex) {
+      const c = S.colectas.find(k => k.rowIndex === rowIndex);
+      const tr = document.getElementById(`col-row-${rowIndex}`);
+      if (!c || !tr) return;
+
+      const nuevoValor = document.getElementById(`ec-horario-${rowIndex}`)?.value.trim() || '';
+      c.horario = nuevoValor;
+
+      tr.classList.remove('editando');
+      tr.innerHTML = vistaFilaColectas(c);
+      S.editandoCol = null;
+
+      if (S.config.appsUrl) {
+        try {
+          const { sheetIdRec, sheetId } = S.config;
+          const idToUse = sheetIdRec || sheetId;
+          const idPar = idToUse ? `&docid=${idToUse}` : '';
+          await pingAppsScript(`${S.config.appsUrl}?action=updateRecorridoFila&sheet=${enc('CLIENTES')}&row=${rowIndex}&field=horario_colecta&value=${enc(nuevoValor)}${idPar}`);
+          toast('✓ Horario actualizado en Sheets', 'ok');
+        } catch (e) {
+          toast('⚠ Error al sincronizar con Sheets', 'err');
+        }
+      }
+    }
+
+    // ══════════════════════════════════════
+    // BASE DE DATOS CHOFERES
+    // ══════════════════════════════════════
+    // (Antiguo accederDB eliminado, ahora centralizado en admin)
+
+    async function cargarDB() {
+      if (!S.config) return;
+      const tbody = document.getElementById('tbody-db');
+      tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="spinner" style="margin:20px auto"></div>Cargando base de datos...</td></tr>';
+
+      try {
+        const { sheetId, apiKey, sheetIdRec } = S.config;
+        const sid = sheetIdRec || sheetId;
+        const r = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sid}/values/${enc('BASE DE DATOS CHOFERES!A1:Z')}?key=${apiKey}`);
+
+        if (!r.ok) {
+          const err = await r.json();
+          throw new Error(err.error?.message || "No se pudo leer la hoja. Verificá el nombre 'BASE DE DATOS CHOFERES'.");
+        }
+
+        const rows = (await r.json()).values || [];
+        if (rows.length <= 1) {
+          tbody.innerHTML = '<tr><td colspan="9" class="empty-state">La base de datos está vacía (solo encabezados).</td></tr>';
+          return;
+        }
+
+        S.dbChoferes = [];
+        for (let i = 1; i < rows.length; i++) {
+          const r0 = rows[i];
+          if (!r0[1] && !r0[0]) continue; // Si no hay ID o nombre, ignorar
+          S.dbChoferes.push({
+            id: i + 1,
+            choferIdAt: r0[0] || '', // Col A
+            nombre: r0[1] || '',     // Col B
+            tel: r0[2] || '',        // Col C
+            dni: r0[3] || '',        // Col D
+            zona: r0[4] || '',       // Col E
+            direccion: r0[5] || '',  // Col F
+            ingreso: r0[6] || '',    // Col G
+            activo: r0[7]?.toString().toUpperCase() === 'TRUE' // Col H
+          });
+        }
+        S.dbChoferesFiltrados = [...S.dbChoferes];
+        renderDB(S.dbChoferesFiltrados);
+        setStatus('ok');
+      } catch (err) {
+        setStatus('error');
+        toast('❌ DB Error: ' + err.message, 'err');
+        tbody.innerHTML = `<tr><td colspan="9" class="empty-state" style="color:#ff8080">${err.message}</td></tr>`;
+      }
+    }
+
+    function renderDB(lista) {
+      const tbody = document.getElementById('tbody-db');
+      tbody.innerHTML = '';
+      if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="9" class="empty-state">No hay registros.</td></tr>';
+        return;
+      }
+      lista.forEach(c => {
+        const tr = document.createElement('tr');
+        tr.id = `db-row-${c.id}`;
+        tr.dataset.rowid = c.id;
+        tr.draggable = false; // Se activa al pasar el mouse por el handle
+        tr.innerHTML = vistaFilaDB(c);
+        tbody.appendChild(tr);
+      });
+      initDragDropDB(tbody);
+    }
+
+    function vistaFilaDB(c) {
+      return `
+        <td style="width:28px;padding:0;text-align:center;"><span class="drag-handle" title="Reordenar">⠿</span></td>
+        <td>${x(c.choferIdAt)}</td>
+        <td class="td-cliente">${x(c.nombre)}</td>
+        <td class="td-horario">${x(c.tel)}</td>
+        <td>${x(c.dni)}</td>
+        <td>${x(c.zona)}</td>
+        <td class="td-dir">${x(c.direccion)}</td>
+        <td>${x(c.ingreso)}</td>
+        <td style="text-align:center"><input type="checkbox" ${c.activo ? 'checked' : ''} onchange="toggleActivoDB(${c.id}, this)"></td>
+        <td class="td-acciones">
+          <button class="btn-edit" onclick="editarFilaDB(${c.id})">✏</button>
+          <button class="btn-del" onclick="eliminarFilaDB(${c.id})">🗑</button>
+        </td>`;
+    }
+
+    function filtrarDB() {
+      const q = document.getElementById('search-db-choferes').value.toLowerCase();
+      S.dbChoferesFiltrados = q
+        ? S.dbChoferes.filter(c => c.nombre.toLowerCase().includes(q) || c.dni.toString().includes(q))
+        : [...S.dbChoferes];
+      renderDB(S.dbChoferesFiltrados);
+    }
+
+    function editarFilaDB(rowId) {
+      if (S.editandoDB && S.editandoDB !== rowId) cancelarFilaDB(S.editandoDB);
+      S.editandoDB = rowId;
+      const c = S.dbChoferes.find(k => k.id === rowId);
+      const tr = document.getElementById(`db-row-${rowId}`);
+      if (!c || !tr) return;
+      tr.classList.add('editando');
+      tr.innerHTML = vistaEdicionDB(c);
+    }
+
+    function vistaEdicionDB(c) {
+      return `
+        <td></td>
+        <td><input type="text" class="inp-inline" id="db-in-idat-${c.id}" value="${x(c.choferIdAt)}"></td>
+        <td><input type="text" class="inp-inline" id="db-in-nom-${c.id}" value="${x(c.nombre)}"></td>
+        <td><input type="text" class="inp-inline" id="db-in-tel-${c.id}" value="${x(c.tel)}"></td>
+        <td><input type="text" class="inp-inline" id="db-in-dni-${c.id}" value="${x(c.dni)}"></td>
+        <td><input type="text" class="inp-inline" id="db-in-zon-${c.id}" value="${x(c.zona)}"></td>
+        <td><input type="text" class="inp-inline" id="db-in-dir-${c.id}" value="${x(c.direccion)}"></td>
+        <td><input type="text" class="inp-inline" id="db-in-ing-${c.id}" value="${x(c.ingreso)}"></td>
+        <td style="text-align:center"><input type="checkbox" id="db-in-act-${c.id}" ${c.activo ? 'checked' : ''}></td>
+        <td class="td-acciones">
+          <button class="btn-save" onclick="guardarFilaDB(${c.id})">✓</button>
+          <button class="btn-cancel" onclick="cancelarFilaDB(${c.id})">✕</button>
+        </td>`;
+    }
+
+    function cancelarFilaDB(rowId) {
+      const c = S.dbChoferes.find(k => k.id === rowId);
+      const tr = document.getElementById(`db-row-${rowId}`);
+      if (!c || !tr) return;
+      tr.classList.remove('editando');
+      tr.innerHTML = vistaFilaDB(c);
+      if (S.editandoDB === rowId) S.editandoDB = null;
+    }
+
+    async function guardarFilaDB(rowId) {
+      const c = S.dbChoferes.find(k => k.id === rowId);
+      if (!c) return;
+      const nom = document.getElementById(`db-in-nom-${rowId}`).value.trim();
+      const dir = document.getElementById(`db-in-dir-${rowId}`).value.trim();
+      const dni = document.getElementById(`db-in-dni-${rowId}`).value.trim();
+      const zon = document.getElementById(`db-in-zon-${rowId}`).value.trim();
+      const tel = document.getElementById(`db-in-tel-${rowId}`).value.trim();
+      const ing = document.getElementById(`db-in-ing-${rowId}`).value.trim();
+      const idat = document.getElementById(`db-in-idat-${rowId}`).value.trim();
+      c.nombre = nom; c.direccion = dir; c.dni = dni; c.zona = zon; c.tel = tel; c.ingreso = ing; c.choferIdAt = idat;
+      if (S.config.appsUrl) {
+        const { sheetId, sheetIdRec } = S.config;
+        const sid = sheetIdRec || sheetId;
+        const urlBase = `${S.config.appsUrl}?action=updateRecorridoFila&sheet=${enc('BASE DE DATOS CHOFERES')}&row=${rowId}&docid=${sid}`;
+        toast('Sincronizando...', 'info');
+        await Promise.all([
+          pingAppsScript(`${urlBase}&field=db_nombre&value=${enc(nom)}`),
+          pingAppsScript(`${urlBase}&field=db_dir&value=${enc(dir)}`),
+          pingAppsScript(`${urlBase}&field=db_dni&value=${enc(dni)}`),
+          pingAppsScript(`${urlBase}&field=db_zona&value=${enc(zon)}`),
+          pingAppsScript(`${urlBase}&field=db_cel&value=${enc(tel)}`),
+          pingAppsScript(`${urlBase}&field=db_ingreso&value=${enc(ing)}`),
+          pingAppsScript(`${urlBase}&field=db_id&value=${enc(idat)}`)
+        ]);
+        toast('✓ Cambios guardados', 'ok');
+      }
+      cancelarFilaDB(rowId);
+    }
+
+    async function eliminarFilaDB(rowId) {
+      if (!confirm("¿Borrar definitivamente este conductor de la Base de Datos?")) return;
+      if (S.config.appsUrl) {
+        const { sheetId, sheetIdRec } = S.config;
+        const sid = sheetIdRec || sheetId;
+        toast('Borrando...', 'info');
+        await pingAppsScript(`${S.config.appsUrl}?action=deleteRow&sheet=${enc('BASE DE DATOS CHOFERES')}&row=${rowId}&docid=${sid}`);
+        toast('✓ Eliminado', 'ok');
+        cargarDB();
+      }
+    }
+
+    async function agregarFilaDB() {
+      abrirModalNuevoChofer();
+    }
+
+    function abrirModalNuevoChofer() {
+      document.getElementById('modal-nuevo-chofer').style.display = 'flex';
+      document.getElementById('nc-idat').focus();
+    }
+
+    function cerrarModalNuevoChofer() {
+      document.getElementById('modal-nuevo-chofer').style.display = 'none';
+      ['nc-idat','nc-nom','nc-cel','nc-dni','nc-zon','nc-dir','nc-ing'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+    }
+
+    async function confirmarNuevoChofer() {
+      const idat = document.getElementById('nc-idat').value.trim();
+      const nom  = document.getElementById('nc-nom').value.trim();
+      const cel  = document.getElementById('nc-cel').value.trim();
+      const dni  = document.getElementById('nc-dni').value.trim();
+      const zon  = document.getElementById('nc-zon').value.trim();
+      const dir  = document.getElementById('nc-dir').value.trim();
+      const ing  = document.getElementById('nc-ing').value.trim();
+
+      if (!idat) { toast('❌ El ID es obligatorio', 'err'); document.getElementById('nc-idat').focus(); return; }
+      if (!nom)  { toast('❌ El nombre es obligatorio', 'err'); document.getElementById('nc-nom').focus(); return; }
+
+      cerrarModalNuevoChofer();
+
+      if (S.config.appsUrl) {
+        const { sheetId, sheetIdRec } = S.config;
+        const sid = sheetIdRec || sheetId;
+        toast('Agregando...', 'info');
+        const url = `${S.config.appsUrl}?action=addChofer&idat=${enc(idat)}&nombre=${enc(nom)}&tel=${enc(cel)}` +
+          `&dni=${enc(dni)}&zona=${enc(zon)}&dir=${enc(dir)}&ingreso=${enc(ing)}&docid=${sid}`;
+        await pingAppsScript(url);
+        toast('✓ Conductor agregado', 'ok');
+        cargarDB();
+      } else {
+        toast('⚠️ No hay URL de Apps Script configurada', 'err');
+      }
+    }
+
+    // ══════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════
+    function cargando(show) {
+      document.getElementById('loading').style.display = show ? 'block' : 'none';
+      document.getElementById('error-msg').style.display = 'none';
+      if (show) {
+        document.getElementById('page-despacho').classList.remove('active');
+        document.getElementById('page-clientes').classList.remove('active');
+      }
+    }
+
+    function mostrarError(msg) {
+      const el = document.getElementById('error-msg');
+      el.innerHTML = `<strong>❌ Error al conectar</strong><br><br>${msg}<br><br>
+    <small>Revisá que la API Key tenga Google Sheets API habilitada y que la planilla esté compartida como Lector.</small>`;
+      el.style.display = 'block';
+      document.getElementById('loading').style.display = 'none';
+    }
+
+    function setStatus(s) {
+      document.getElementById('status-dot').className = 'status-dot' + (s ? ' ' + s : '');
+    }
+
+    function toast(msg, tipo = 'ok') {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.className = `show ${tipo}`;
+      clearTimeout(t._t);
+      t._t = setTimeout(() => t.className = '', 3200);
+    }
+
+    function enc(s) { return encodeURIComponent(s); }
+    function x(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+    // ══════════════════════════════════════
+    // UI CONTROLS
+    // ══════════════════════════════════════
+    function toggleMenu(forceOpen) {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      if (!sidebar || !overlay) return;
+      const isOpen = sidebar.classList.contains('open');
+      const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !isOpen;
+      sidebar.classList.toggle('open', shouldOpen);
+      overlay.classList.toggle('show', shouldOpen);
+    }
+
+    function toggleTheme() {
+      const root = document.documentElement;
+      const isLight = root.getAttribute('data-theme') === 'light';
+      const newTheme = isLight ? 'dark' : 'light';
+      root.setAttribute('data-theme', newTheme);
+      localStorage.setItem('col_theme', newTheme);
+      const btn = document.getElementById('btn-theme');
+      if (btn) btn.innerHTML = newTheme === 'light' ? '🌙 Modo Oscuro' : '☀️ Modo Claro';
+    }
+
+    function aplicarTemaGuardado() {
+      const theme = localStorage.getItem('col_theme') || 'dark';
+      document.documentElement.setAttribute('data-theme', theme);
+      const btn = document.getElementById('btn-theme');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 Modo Oscuro' : '☀️ Modo Claro';
+    }
+
+    iniciar();
+  </script>
+</body>
+
+</html>

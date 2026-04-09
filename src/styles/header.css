@@ -1,0 +1,242 @@
+/* ════════════════════════════════════════════════════════════════
+   ESTILOS DEL HEADER - Barra Superior Fija
+   v3.0 — Polished, GPU-accelerated, no-lag
+   ════════════════════════════════════════════════════════════════ */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 110;
+
+  background: linear-gradient(135deg, #0f172a 0%, #1a2742 100%);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 20px rgba(0, 0, 0, 0.4);
+
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  height: 72px;
+  min-height: 72px;
+
+  /* Glassmorphism sutil sobre el fondo */
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+}
+
+/* ─── BORDE INFERIOR BRILLANTE ─────────────────────────────── */
+.app-header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(59, 130, 246, 0.4) 30%,
+      rgba(59, 130, 246, 0.6) 50%,
+      rgba(59, 130, 246, 0.4) 70%,
+      transparent 100%);
+  pointer-events: none;
+}
+
+/* ─── LIGHT MODE ─────────────────────────────────────────── */
+.app.theme-light .app-header {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e8f0fe 100%);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.12);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.app.theme-light .app-header::after {
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(2, 132, 199, 0.35) 30%,
+      rgba(2, 132, 199, 0.55) 50%,
+      rgba(2, 132, 199, 0.35) 70%,
+      transparent 100%);
+}
+
+/* ─── BOTÓN DE MARCA ───────────────────────────────────────── */
+.brand-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition:
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 150ms ease;
+  will-change: transform;
+  position: relative;
+  overflow: visible;
+}
+
+.brand-button:hover {
+  transform: scale(1.03);
+  background-color: rgba(59, 130, 246, 0.06);
+}
+
+.brand-button:active {
+  transform: scale(0.98);
+  transition-duration: 80ms;
+}
+
+/* ─── ICONO DE MARCA ───────────────────────────────────────── */
+.brand-icon {
+  color: #3b82f6;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.35));
+  transition:
+    color 200ms ease,
+    transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    filter 200ms ease;
+  will-change: transform, filter;
+  flex-shrink: 0;
+}
+
+.brand-button:hover .brand-icon {
+  color: #60a5fa;
+  filter:
+    drop-shadow(0 0 10px rgba(59, 130, 246, 0.65)) drop-shadow(0 0 20px rgba(59, 130, 246, 0.25));
+  transform: translateY(-2px) rotate(-4deg);
+}
+
+.brand-button:active .brand-icon {
+  transform: translateY(0) rotate(0deg);
+  transition-duration: 80ms;
+}
+
+.app.theme-light .brand-icon {
+  color: #0284c7;
+  filter: drop-shadow(0 0 6px rgba(2, 132, 199, 0.3));
+}
+
+.app.theme-light .brand-button:hover .brand-icon {
+  color: #3b82f6;
+  filter:
+    drop-shadow(0 0 10px rgba(59, 130, 246, 0.5)) drop-shadow(0 0 20px rgba(59, 130, 246, 0.2));
+}
+
+/* ─── TEXTO DE MARCA ───────────────────────────────────────── */
+.brand-text {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+
+  background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 60%, #c7d2fe 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+
+  transition: letter-spacing 200ms ease;
+}
+
+.brand-button:hover .brand-text {
+  letter-spacing: 0px;
+}
+
+.app.theme-light .brand-text {
+  background: linear-gradient(135deg, #0284c7 0%, #3b82f6 60%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── BOTÓN HAMBURGUESA MÓVIL ───────────────────────────── */
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 8px;
+  color: #3b82f6;
+  transition:
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 150ms ease,
+    color 150ms ease;
+  margin-right: 12px;
+  will-change: transform;
+  flex-shrink: 0;
+}
+
+.mobile-menu-btn:hover {
+  background-color: rgba(59, 130, 246, 0.12);
+  transform: scale(1.1);
+}
+
+.mobile-menu-btn:active {
+  transform: scale(0.95);
+  transition-duration: 80ms;
+}
+
+.app.theme-light .mobile-menu-btn:hover {
+  background-color: rgba(59, 130, 246, 0.15);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   MEDIA QUERIES
+   ════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 12px 16px;
+    height: 64px;
+    min-height: 64px;
+    justify-content: flex-start;
+  }
+
+  .mobile-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .brand-button {
+    flex: 1;
+  }
+
+  .brand-text {
+    font-size: 20px;
+  }
+
+  .brand-button {
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 10px 12px;
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .brand-text {
+    font-size: 18px;
+  }
+}
+
+/* ─── REDUCED MOTION ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+
+  .brand-button,
+  .brand-icon,
+  .brand-text,
+  .mobile-menu-btn {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

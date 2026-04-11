@@ -407,7 +407,7 @@ function PantallaDashboard() {
   // Lógica Dinámica
   const datosActivos = tabDashboard === 'SÁBADOS' ? colectasSabados : colectas;
   const totalPaquetes = datosActivos.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
-  const totalEntregados = datosActivos.reduce((s, c) => s + (c.entregados || 0), 0);
+  const totalEntregados = datosActivos.reduce((s, c) => s + (c.entregados || 0) + (c.entregadosFuera || 0), 0);
   const pctGlobal = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : 0;
   const rutasSinChoferActivas = datosActivos.filter(c => !c.idChofer || c.idChofer === 0);
 
@@ -516,7 +516,7 @@ function PantallaDashboard() {
           {ZONAS.map(zona => {
             const items = datosActivos.filter(c => c.zona === zona);
             const pqtes = items.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
-            const entregados = items.reduce((s, c) => s + (c.entregados || 0), 0);
+            const entregados = items.reduce((s, c) => s + (c.entregados || 0) + (c.entregadosFuera || 0), 0);
             const pct = pqtes > 0 ? ((entregados / pqtes) * 100).toFixed(1) : 0;
             const color = coloresZona[zona];
             const sinChofer = items.filter(c => !c.idChofer || c.idChofer === 0).length;
@@ -785,6 +785,7 @@ function PantallaRecorridos() {
     setColectasLocales(prev => prev.map(item =>
       item.id === id ? { ...item, [campo]: num } : item
     ));
+    // entregadosFuera también se persiste como campo numérico
     const { error } = await supabase
       .from(tablaActual)
       .update({ [campo]: num })
@@ -1021,6 +1022,7 @@ function PantallaRecorridos() {
                         <col style={{ width: '90px' }} />   {/* PQTE DÍA */}
                         <col style={{ width: '90px' }} />   {/* POR FUERA */}
                         <col style={{ width: '90px' }} />   {/* ENTREGADOS */}
+                        <col style={{ width: '90px' }} />   {/* ENT. FUERA */}
                         <col style={{ width: '90px' }} />   {/* % DÍA */}
                         <col style={{ width: '40px' }} />   {/* ACCIÓN */}
                       </colgroup>
@@ -1132,6 +1134,20 @@ function PantallaRecorridos() {
                             textTransform: 'uppercase',
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                              <CheckCircle size={13} color='#f59e0b' />
+                              Ent. Fuera
+                            </div>
+                          </th>
+                          <th style={{
+                            padding: '10px 8px',
+                            textAlign: 'center',
+                            color: colors.textSecondary,
+                            fontWeight: '700',
+                            fontSize: '11px',
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
                               <TrendingUp size={13} color={zoneColor} />
                               % Día
                             </div>
@@ -1151,8 +1167,9 @@ function PantallaRecorridos() {
                           <tbody>
                             {datosZona.map((item, idx) => {
                               const total = (item.pqteDia || 0) + (item.porFuera || 0);
+                              const entregadosTotales = (item.entregados || 0) + (item.entregadosFuera || 0);
                               const porcentaje = total > 0
-                                ? parseFloat(((item.entregados / total) * 100).toFixed(1))
+                                ? parseFloat(((entregadosTotales / total) * 100).toFixed(1))
                                 : 0;
                               const porcentajeStr = porcentaje + '%';
 
@@ -1170,6 +1187,7 @@ function PantallaRecorridos() {
                                   obtenerNombreChofer={obtenerNombreChofer}
                                   getPercentageColor={getPercentageColor}
                                   porcentajeStr={porcentajeStr}
+                                  entregadosFuera={item.entregadosFuera || 0}
                                   onEliminar={() => { setRecorridoAEliminar(item); setConfirmDeleteRecorrido(true); }}
                                 />
                               );
@@ -1967,7 +1985,7 @@ function SortableFilaLocalidad({
   item, idx, colors, zoneColor, theme,
   choferes, guardarCambioBD, guardarLocalidad,
   obtenerNombreChofer, getPercentageColor, porcentajeStr,
-  onEliminar
+  entregadosFuera, onEliminar
 }) {
   const {
     attributes,
@@ -2128,11 +2146,24 @@ function SortableFilaLocalidad({
         />
       </td>
 
-      {/* % DÍA */}
+      {/* ENTREGADOS POR FUERA — input editable, sumado al % */}
+      <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+        <input
+          type="number"
+          value={entregadosFuera || ''}
+          onChange={(e) => guardarCambioBD(item.id, 'entregadosFuera', e.target.value)}
+          style={{ padding: '6px 8px', border: `1px solid ${colors.borderLight}`, borderRadius: '6px', backgroundColor: colors.inputBg, color: '#f59e0b', fontSize: '13px', fontWeight: '600', outline: 'none', textAlign: 'center', transition: 'all 0.2s ease', width: '62px' }}
+          onFocus={(e) => { e.target.style.borderColor = '#f59e0b'; e.target.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.2)'; e.target.style.backgroundColor = colors.inputFocusBg; }}
+          onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
+        />
+      </td>
+
+      {/* % DÍA — ahora incluye entregados + entregadosFuera */}
       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
         {(() => {
           const total = (item.pqteDia || 0) + (item.porFuera || 0);
-          const pct = total > 0 ? parseFloat(((item.entregados || 0) / total * 100).toFixed(1)) : 0;
+          const entTotales = (item.entregados || 0) + (entregadosFuera || 0);
+          const pct = total > 0 ? parseFloat((entTotales / total * 100).toFixed(1)) : 0;
           const color = pct >= 100 ? '#10b981' : pct >= 80 ? '#06b6d4' : pct >= 50 ? '#f59e0b' : pct > 0 ? '#ef4444' : '#64748b';
           return (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
@@ -2143,6 +2174,11 @@ function SortableFilaLocalidad({
                 <div style={{ width: '50px', height: '4px', borderRadius: '2px', backgroundColor: `${color}25`, overflow: 'hidden' }}>
                   <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, backgroundColor: color, borderRadius: '2px', transition: 'width 0.4s ease' }} />
                 </div>
+              )}
+              {(entregadosFuera || 0) > 0 && (
+                <span style={{ fontSize: '10px', color: '#f59e0b', fontWeight: '600' }}>
+                  +{entregadosFuera} fuera
+                </span>
               )}
             </div>
           );

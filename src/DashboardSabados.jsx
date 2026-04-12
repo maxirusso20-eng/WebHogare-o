@@ -45,6 +45,10 @@ function CeldaLocalidadEditable({ item, colors, zoneColor, onSave }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.target.blur();
           if (e.key === 'Escape') { setValor(item.localidad); setEditando(false); }
+          if (e.key === 'Backspace' && valor === item.localidad) {
+            e.preventDefault();
+            setValor('');
+          }
         }}
         style={{
           width: '100%', padding: '4px 8px', borderRadius: '6px',
@@ -140,6 +144,12 @@ function SortableFilaSabado({ item, idx, colors, zoneColor, theme, guardarCambio
           value={item.idChofer || ''}
           placeholder="ID"
           onChange={(e) => guardarCambioBD(item.id, 'idChofer', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.idChofer && String(e.target.value) === String(item.idChofer)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'idChofer', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '70px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -151,6 +161,12 @@ function SortableFilaSabado({ item, idx, colors, zoneColor, theme, guardarCambio
         <input
           type="number" value={item.pqteDia || ''}
           onChange={(e) => guardarCambioBD(item.id, 'pqteDia', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.pqteDia && String(e.target.value) === String(item.pqteDia)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'pqteDia', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '60px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -162,6 +178,12 @@ function SortableFilaSabado({ item, idx, colors, zoneColor, theme, guardarCambio
         <input
           type="number" value={item.porFuera || ''}
           onChange={(e) => guardarCambioBD(item.id, 'porFuera', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.porFuera && String(e.target.value) === String(item.porFuera)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'porFuera', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '60px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -173,6 +195,12 @@ function SortableFilaSabado({ item, idx, colors, zoneColor, theme, guardarCambio
         <input
           type="number" value={item.entregados || ''}
           onChange={(e) => guardarCambioBD(item.id, 'entregados', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.entregados && String(e.target.value) === String(item.entregados)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'entregados', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '60px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}

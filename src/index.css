@@ -157,6 +157,7 @@ body {
   .main-content {
     padding: 20px 24px;
   }
+
   .main-content:has(.pantalla-maps) {
     padding: 0;
   }
@@ -166,6 +167,7 @@ body {
   .main-content {
     padding: 14px 16px;
   }
+
   .main-content:has(.pantalla-maps) {
     padding: 0;
   }
@@ -1023,4 +1025,52 @@ tr:hover .drag-handle {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ─────────────────────────────────────────────
+   BOTÓN BORRAR HISTORIAL
+   ───────────────────────────────────────────── */
+.btn-danger-historial {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: linear-gradient(135deg, rgba(63, 26, 26, 0.9) 0%, rgba(45, 21, 21, 0.95) 100%);
+  color: #f87171;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.12);
+  white-space: nowrap;
+}
+
+.btn-danger-historial:hover {
+  background: linear-gradient(135deg, rgba(95, 32, 32, 0.95) 0%, rgba(63, 26, 26, 0.95) 100%);
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.28);
+  transform: translateY(-1px);
+  color: #fca5a5;
+}
+
+.btn-danger-historial:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.15);
+}
+
+/* Variante para tema claro */
+.theme-light .btn-danger-historial {
+  background: linear-gradient(135deg, #fff1f1 0%, #ffe4e4 100%);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.1);
+}
+
+.theme-light .btn-danger-historial:hover {
+  background: linear-gradient(135deg, #ffe4e4 0%, #fecaca 100%);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.2);
+  color: #b91c1c;
 }

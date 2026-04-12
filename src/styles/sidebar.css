@@ -10,7 +10,7 @@
   background-color: #f3f4f6;
   border-right: 1px solid #e5e7eb;
   transition:
-    width 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   position: relative;
   z-index: 100;
@@ -272,7 +272,32 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  transition: letter-spacing 150ms ease;
+  /* Transiciones suaves de aparición */
+  opacity: 1;
+  max-width: 160px;
+  transition:
+    opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    letter-spacing 150ms ease;
+}
+
+/* Colapso: ocultar label con fade + ancho */
+.sidebar.collapsed .nav-label {
+  opacity: 0;
+  max-width: 0;
+  overflow: hidden;
+}
+
+/* Colapso: centrar ícono y eliminar gap */
+.sidebar.collapsed .nav-link {
+  justify-content: center;
+  gap: 0;
+}
+
+/* Colapso: ocultar indicador activo */
+.sidebar.collapsed .nav-indicator {
+  opacity: 0 !important;
+  transform: translateY(-50%) scaleY(0) !important;
 }
 
 .sidebar.theme-light .nav-label {

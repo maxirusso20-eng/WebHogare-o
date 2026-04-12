@@ -37,6 +37,21 @@ export function Sidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // ESC: cerrar/minimizar el sidebar cuando está abierto
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      if (isMobile && isMobileOpen) {
+        setIsMobileOpen(false);
+      } else if (!isMobile && !isCollapsed) {
+        setIsCollapsed(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobile, isMobileOpen, isCollapsed]);
+
   // Si estamos en móvil, mostrar antes de navItems
 
   const navItems = [
@@ -133,7 +148,11 @@ export function Sidebar({
 
   // VERSIÓN DESKTOP
   return (
-    <nav className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'} theme-${theme}`}>
+    <nav
+      className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'} theme-${theme}`}
+      onMouseEnter={() => { if (isCollapsed) setIsCollapsed(false); }}
+      onMouseLeave={() => { if (!isCollapsed) setIsCollapsed(true); }}
+    >
       {/* HEADER DEL SIDEBAR DESKTOP - Abierto/Cerrado */}
       <div className={`sidebar-toggle ${!isCollapsed ? 'sidebar-header-open' : ''}`}>
         {!isCollapsed && (
@@ -169,8 +188,8 @@ export function Sidebar({
               >
                 {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
               </span>
-              {!isCollapsed && <span className="nav-label">{item.label}</span>}
-              {!isCollapsed && currentPage === item.id && (
+              <span className="nav-label">{item.label}</span>
+              {currentPage === item.id && (
                 <span className="nav-indicator"></span>
               )}
             </button>
@@ -185,7 +204,7 @@ export function Sidebar({
             // Modo colapsado: Solo icono centrado del tema actual
             <button
               className="theme-icon-only"
-              onClick={toggleTheme}
+              onClick={() => toggleTheme()}
               title={`Cambiar a ${theme === 'light' ? 'Oscuro' : 'Claro'}`}
               aria-label="Toggle theme"
             >

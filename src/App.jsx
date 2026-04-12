@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, createContext, useRef, useContext } from 'react';
 import { supabase } from './supabase';
 import './index.css';
-import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, BookOpen, Archive, Download, Clock, ClipboardList } from 'lucide-react';
+import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, BookOpen, Archive, Download, Clock, ClipboardList, ChevronDown } from 'lucide-react';
 import { DashboardSabados } from './DashboardSabados';
 import {
   DndContext,
@@ -26,6 +26,7 @@ import { Sidebar } from './components/Sidebar';
 import { ModalAgregarChofer } from './components/ModalAgregarChofer';
 import { ModalConfirmarEliminar } from './components/ModalConfirmarEliminar';
 import { ModalAgregarCliente } from './components/ModalAgregarCliente';
+import { ModalConfirmacion } from './components/ModalConfirmacion';
 import { TarjetaChofer } from './components/TarjetaChofer';
 import { PantallaMaps } from './components/PantallaMaps';
 
@@ -44,6 +45,8 @@ function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [toasts, setToasts] = useState([]);
   const [isSidebarMobileOpen, setIsSidebarMobileOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [itemAEliminar, setItemAEliminar] = useState(null);
 
   // ─── APLICAR TEMA AL CARGAR ────────────────────────────
   useEffect(() => {
@@ -630,6 +633,7 @@ function PantallaRecorridos() {
   const [recorridoAEliminar, setRecorridoAEliminar] = useState(null);
   const [confirmDeleteRecorrido, setConfirmDeleteRecorrido] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, titulo: '', mensaje: '', textoConfirmar: '', isDanger: false, accion: null });
   const [selectedZona, setSelectedZona] = useState(null);
   const [tabActiva, setTabActiva] = useState('LUNES A VIERNES');
   const [colectasLocales, setColectasLocales] = useState([]);
@@ -845,6 +849,11 @@ function PantallaRecorridos() {
 
   const ZONAS = ['ZONA OESTE', 'ZONA SUR', 'ZONA NORTE', 'CABA'];
 
+  const totalPaquetes = colectasLocales.reduce((s, r) => s + (r.pqteDia || 0) + (r.porFuera || 0), 0);
+  const totalEntregados = colectasLocales.reduce((s, r) => s + (r.entregados || 0), 0);
+  const pctGlobal = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : '0.0';
+  const colorStatsCards = tabActiva === 'SÁBADOS' ? '#f59e0b' : (theme === 'light' ? '#3b82f6' : '#64b5f6');
+  const labelTabActiva = tabActiva === 'SÁBADOS' ? 'Sábados' : 'Lunes a Viernes';
   if (loadingLocal) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px', color: colors.textSecondary, backgroundColor: colors.backgroundColor }}>
@@ -864,44 +873,60 @@ function PantallaRecorridos() {
               Gestión de Rutas y Paquetes
             </h1>
           </div>
-          <button
-            onClick={async () => {
-              if (!window.confirm(`¿Guardar el estado actual de las tablas (${tabActiva}) en el historial?`)) return;
-              try {
-                const fecha = new Date().toISOString().split('T')[0];
-                const snapshot = colectasLocales.map(item => ({
-                  fecha,
-                  tipo_dia: tabActiva,
-                  id_ruta: item.id,
-                  zona: item.zona,
-                  localidad: item.localidad,
-                  id_chofer: item.idChofer || null,
-                  pqte_dia: item.pqteDia || 0,
-                  por_fuera: item.porFuera || 0,
-                  entregados: item.entregados || 0,
-                }));
-                const { error } = await supabase.from('historial_recorridos').insert(snapshot);
-                if (error) throw error;
-                mostrarToast(`✅ Historial guardado (${fecha})`, 'success');
-              } catch (err) {
-                console.error(err);
-                mostrarToast(`❌ Error al guardar historial: ${err.message}`, 'error');
-              }
-            }}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '6px',
-              padding: '8px 16px', borderRadius: '8px', border: 'none',
-              backgroundColor: theme === 'light' ? '#0f172a' : '#334155',
-              color: 'white', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-            title="Guardar estado actual en el historial"
-          >
-            <Archive size={16} strokeWidth={2} />
-            Guardar en Historial
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {/* GUARDAR EN HISTORIAL */}
+            <button
+              onClick={async () => {
+                setConfirmConfig({
+                  isOpen: true,
+                  titulo: 'Guardar Historial',
+                  mensaje: `¿Guardar el estado actual (${tabActiva}) en el historial y resetear los números?`,
+                  textoConfirmar: 'Guardar en Historial',
+                  isDanger: false,
+                  accion: async () => {
+                    try {
+                      const fecha = new Date().toISOString().split('T')[0];
+                      const snapshot = colectasLocales.map(item => ({
+                        fecha,
+                        tipo_dia: tabActiva,
+                        id_ruta: item.id,
+                        zona: item.zona,
+                        localidad: item.localidad,
+                        id_chofer: item.idChofer || null,
+                        pqte_dia: item.pqteDia || 0,
+                        por_fuera: item.porFuera || 0,
+                        entregados: item.entregados || 0,
+                      }));
+                      const { error } = await supabase.from('historial_recorridos').insert(snapshot);
+                      if (error) throw error;
+
+                      // Resetear todos los números a 0 en BD y estado local
+                      const ids = colectasLocales.map(i => i.id);
+                      await supabase
+                        .from(tablaActual)
+                        .update({ pqteDia: 0, porFuera: 0, entregados: 0, entregadosFuera: 0 })
+                        .in('id', ids);
+
+                      setColectasLocales(prev => prev.map(item => ({
+                        ...item, pqteDia: 0, porFuera: 0, entregados: 0, entregadosFuera: 0,
+                      })));
+
+                      mostrarToast(`✅ Historial guardado y números reseteados (${fecha})`, 'success');
+                    } catch (err) {
+                      console.error(err);
+                      mostrarToast(`❌ Error al guardar historial: ${err.message}`, 'error');
+                    }
+                  }
+                });
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg font-semibold text-sm transition-all duration-150 hover:bg-blue-600 active:scale-95 shadow-sm"
+              title="Guarda el estado actual en historial y resetea los números a 0"
+            >
+              <Archive size={15} strokeWidth={2} />
+              Guardar en Historial
+            </button>
+
+          </div>
         </div>
       </div>
 
@@ -925,6 +950,25 @@ function PantallaRecorridos() {
         ))}
       </div>
 
+      {/* ── STATS CARDS ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
+        {[
+          { label: `Rutas ${labelTabActiva}`, value: colectasLocales.length, icon: '🗺️', color: colorStatsCards },
+          { label: 'Total paquetes', value: totalPaquetes, icon: '📦', color: '#3b82f6' },
+          { label: 'Entregados', value: totalEntregados, icon: '✅', color: '#10b981' },
+          { label: '% Global', value: pctGlobal + '%', icon: '📈', color: getPercentageColor(pctGlobal) },
+        ].map(({ label, value, icon, color }) => (
+          <div key={label} style={{ backgroundColor: colors.cardBg, borderRadius: '10px', border: `1px solid ${colors.border}`, borderLeft: `4px solid ${color}`, padding: '14px 16px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+              {icon} {label}
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: '800', color }}>
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+
       <>
         {/* ZONAS */}
         <div style={{ display: 'grid', gap: '24px' }}>
@@ -939,7 +983,7 @@ function PantallaRecorridos() {
                   backgroundColor: colors.cardBg,
                   borderRadius: '12px',
                   boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.08)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
-                  overflow: 'hidden',
+                  overflow: 'visible',
                   border: `1px solid ${colors.border}`,
                   transition: 'all 0.2s ease'
                 }}
@@ -991,12 +1035,12 @@ function PantallaRecorridos() {
                       transition: 'all 0.2s ease'
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = `${zoneColor}40`;
-                      e.target.style.transform = 'translateY(-1px)';
+                      e.currentTarget.style.backgroundColor = `${zoneColor}40`;
+                      e.currentTarget.style.transform = 'translateY(-1px)';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = `${zoneColor}20`;
-                      e.target.style.transform = 'translateY(0)';
+                      e.currentTarget.style.backgroundColor = `${zoneColor}20`;
+                      e.currentTarget.style.transform = 'translateY(0)';
                     }}
                   >
                     <Plus size={16} strokeWidth={2.5} />
@@ -1225,14 +1269,14 @@ function PantallaRecorridos() {
                           opacity: '0.8'
                         }}
                         onMouseEnter={(e) => {
-                          e.target.style.opacity = '1';
-                          e.target.style.transform = 'translateY(-2px)';
-                          e.target.style.boxShadow = `0 4px 12px ${zoneColor}40`;
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                          e.currentTarget.style.boxShadow = `0 4px 12px ${zoneColor}40`;
                         }}
                         onMouseLeave={(e) => {
-                          e.target.style.opacity = '0.8';
-                          e.target.style.transform = 'translateY(0)';
-                          e.target.style.boxShadow = 'none';
+                          e.currentTarget.style.opacity = '0.8';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
                         }}
                       >
                         + Nueva ruta
@@ -1265,6 +1309,20 @@ function PantallaRecorridos() {
         }}
         onCancel={() => { setConfirmDeleteRecorrido(false); setRecorridoAEliminar(null); }}
         tema={theme === 'dark' ? 'dark' : 'light'}
+      />
+
+      <ModalConfirmacion
+        isOpen={confirmConfig.isOpen}
+        titulo={confirmConfig.titulo}
+        mensaje={confirmConfig.mensaje}
+        textoConfirmar={confirmConfig.textoConfirmar}
+        isDanger={confirmConfig.isDanger}
+        tema={theme}
+        onConfirm={() => {
+          if (confirmConfig.accion) confirmConfig.accion();
+          setConfirmConfig(p => ({ ...p, isOpen: false }));
+        }}
+        onCancel={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
       />
     </div>
   );
@@ -1468,11 +1526,227 @@ function PantallaChoferes() {
   );
 }
 
+// ════════════════════════════════════════════════════════════════
+// COMBOBOX DE CHOFER — Fila de tabla (autocomplete inline)
+// ════════════════════════════════════════════════════════════════
+function ChoferComboboxRow({ value, choferes, onChange }) {
+  const [inputVal, setInputVal] = useState(value || '');
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => { setInputVal(value || ''); }, [value]);
+
+  const filtrados = choferes.filter(c =>
+    c.nombre.toLowerCase().includes(inputVal.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setInputVal(value || '');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [value]);
+
+  const seleccionar = (nombre) => {
+    onChange(nombre);
+    setInputVal(nombre);
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <input
+        type="text"
+        value={inputVal}
+        onChange={e => { setInputVal(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            if (open && filtrados.length > 0) {
+              seleccionar(filtrados[0].nombre);
+            }
+          } else if (e.key === 'Escape') {
+            setOpen(false);
+            setInputVal(value || '');
+          } else if (e.key === 'Backspace' && value && inputVal === value) {
+            // Si el input tiene el nombre completo guardado y presionan borrar, limpiar todo
+            e.preventDefault();
+            setInputVal('');
+            onChange('');
+            setOpen(true);
+          }
+        }}
+        placeholder="Seleccionar chofer..."
+        className="theme-input px-2.5 py-1.5 rounded text-sm outline-none"
+        style={{ width: '160px' }}
+        autoComplete="off"
+      />
+      {open && filtrados.length > 0 && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
+          background: 'var(--bg-surface)', border: '1.5px solid var(--border-strong)',
+          borderRadius: '8px', boxShadow: 'var(--shadow-lg)',
+          minWidth: '180px', maxHeight: '200px', overflowY: 'auto',
+          animation: 'fadeUp 0.12s ease-out forwards',
+        }}>
+          {filtrados.map(ch => (
+            <button
+              key={ch.id}
+              type="button"
+              onMouseDown={e => { e.preventDefault(); seleccionar(ch.nombre); }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '8px 12px',
+                background: value === ch.nombre ? 'rgba(59,130,246,0.1)' : 'transparent',
+                color: value === ch.nombre ? 'var(--brand-blue)' : 'var(--text-2)',
+                border: 'none', cursor: 'pointer', fontSize: '13px',
+                fontWeight: value === ch.nombre ? '600' : '400',
+                transition: 'background 0.1s',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}
+              onMouseEnter={e => { if (value !== ch.nombre) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = value === ch.nombre ? 'rgba(59,130,246,0.1)' : 'transparent'; }}
+            >
+              {value === ch.nombre && <span style={{ fontSize: '10px', color: 'var(--brand-blue)' }}>✓</span>}
+              {ch.nombre}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// DROPDOWN CUSTOM — Filtro de chofer con buscador (header filtros)
+// ════════════════════════════════════════════════════════════════
+function ChoferDropdown({ choferes, value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') setIsOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  const filtrados = choferes.filter(c =>
+    c.nombre.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const selectedLabel = value === 'Todos' ? 'Todos los choferes' : value;
+  const hasValue = value !== 'Todos';
+
+  return (
+    <div ref={ref} style={{ position: 'relative', minWidth: '200px' }}>
+      <button
+        type="button"
+        onClick={() => { setIsOpen(o => !o); setSearch(''); }}
+        className="theme-input w-full px-3 py-2 rounded-lg text-sm outline-none"
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+          cursor: 'pointer', fontWeight: hasValue ? '600' : '400',
+          color: hasValue ? 'var(--brand-blue)' : 'var(--text-2)',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedLabel}
+        </span>
+        <ChevronDown
+          size={14}
+          style={{ flexShrink: 0, transition: 'transform 0.2s', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
+        />
+      </button>
+
+      {isOpen && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 200,
+          background: 'var(--bg-surface)', border: '1.5px solid var(--border-strong)',
+          borderRadius: '10px', boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+          animation: 'fadeUp 0.15s ease-out forwards',
+        }}>
+          <div style={{ padding: '8px 8px 4px' }}>
+            <input
+              autoFocus
+              type="text"
+              placeholder="Buscar chofer..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="theme-input w-full px-3 py-1.5 rounded-lg text-sm outline-none"
+              style={{ width: '100%' }}
+            />
+          </div>
+          <div style={{ maxHeight: '220px', overflowY: 'auto', padding: '4px 4px 8px' }}>
+            <button
+              type="button"
+              onClick={() => { onChange('Todos'); setIsOpen(false); }}
+              style={{
+                width: '100%', textAlign: 'left', padding: '8px 12px', borderRadius: '7px',
+                background: value === 'Todos' ? 'rgba(59,130,246,0.12)' : 'transparent',
+                color: value === 'Todos' ? 'var(--brand-blue)' : 'var(--text-2)',
+                border: 'none', cursor: 'pointer', fontSize: '13px',
+                fontWeight: value === 'Todos' ? '700' : '500',
+                display: 'flex', alignItems: 'center', gap: '8px',
+              }}
+            >
+              {value === 'Todos' && <span style={{ color: 'var(--brand-blue)', fontSize: '11px' }}>✓</span>}
+              Todos los choferes
+            </button>
+            {filtrados.length > 0 && (
+              <div style={{ height: '1px', background: 'var(--border)', margin: '4px 8px' }} />
+            )}
+            {filtrados.map(ch => (
+              <button
+                key={ch.id}
+                type="button"
+                onClick={() => { onChange(ch.nombre); setIsOpen(false); }}
+                style={{
+                  width: '100%', textAlign: 'left', padding: '8px 12px', borderRadius: '7px',
+                  background: value === ch.nombre ? 'rgba(59,130,246,0.12)' : 'transparent',
+                  color: value === ch.nombre ? 'var(--brand-blue)' : 'var(--text-2)',
+                  border: 'none', cursor: 'pointer', fontSize: '13px',
+                  fontWeight: value === ch.nombre ? '700' : '500',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  transition: 'background 0.1s',
+                }}
+                onMouseEnter={e => { if (value !== ch.nombre) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={e => { if (value !== ch.nombre) e.currentTarget.style.background = 'transparent'; }}
+              >
+                {value === ch.nombre && <span style={{ color: 'var(--brand-blue)', fontSize: '11px' }}>✓</span>}
+                {ch.nombre}
+              </button>
+            ))}
+            {filtrados.length === 0 && (
+              <p style={{ padding: '12px', textAlign: 'center', color: 'var(--text-3)', fontSize: '13px', margin: 0 }}>
+                Sin resultados
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PantallaClientes() {
 
-  const { clientes, setClientes, mostrarToast, choferes } = useContext(AppContext);
+  const { clientes, setClientes, mostrarToast, choferes, theme } = useContext(AppContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, titulo: '', mensaje: '', textoConfirmar: '', isDanger: false, accion: null });
   const [loading, setLoading] = useState(false);
   const [tabActiva, setTabActiva] = useState('SEMANA'); // 'SEMANA' o 'SÁBADOS'
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
@@ -1524,9 +1798,11 @@ function PantallaClientes() {
           ? tipo === 'SÁBADOS'
           : (tipo === 'SEMANA' || tipo === '' || c.tipo_dia == null);
         const matchChofer = filtroChofer === 'Todos' || (c.chofer || '') === filtroChofer;
+        const q = busquedaCliente.toLowerCase();
         const matchBusqueda = !busquedaCliente ||
-          (c.cliente || '').toLowerCase().includes(busquedaCliente.toLowerCase()) ||
-          (c.direccion || '').toLowerCase().includes(busquedaCliente.toLowerCase());
+          (c.cliente || '').toLowerCase().includes(q) ||
+          (c.direccion || '').toLowerCase().includes(q) ||
+          (c.chofer || '').toLowerCase().includes(q);
         return matchTipo && matchChofer && matchBusqueda;
       })
     );
@@ -1686,33 +1962,38 @@ function PantallaClientes() {
                 mostrarToast('⚠️ No hay llegadas marcadas para guardar', 'warning');
                 return;
               }
-              if (!window.confirm(`¿Guardar ${conLlegada.length} llegada(s) en el historial?`)) return;
-              try {
-                const fecha = new Date().toISOString().split('T')[0];
-                const rows = conLlegada.map(c => ({
-                  fecha,
-                  tipo_dia: tabActiva,
-                  cliente_id: c.id,
-                  cliente_nombre: c.cliente,
-                  chofer: c.chofer || null,
-                  horario_programado: c.horario || null,
-                  hora_llegada: llegadas[c.id],
-                  direccion: c.direccion || null,
-                }));
-                const { error } = await supabase.from('historial_clientes').insert(rows);
-                if (error) throw error;
-                mostrarToast(`✅ ${conLlegada.length} llegada(s) guardadas en historial`, 'success');
-              } catch (err) {
-                mostrarToast(`❌ Error: ${err.message}`, 'error');
-              }
+              setConfirmConfig({
+                isOpen: true,
+                titulo: 'Guardar Historial',
+                mensaje: `¿Guardar ${conLlegada.length} llegada(s) en el historial?`,
+                textoConfirmar: 'Guardar en Historial',
+                isDanger: false,
+                accion: async () => {
+                  try {
+                    const fecha = new Date().toISOString().split('T')[0];
+                    const rows = conLlegada.map(c => ({
+                      fecha,
+                      tipo_dia: tabActiva,
+                      cliente_id: c.id,
+                      cliente_nombre: c.cliente,
+                      chofer: c.chofer || null,
+                      horario_programado: c.horario || null,
+                      hora_llegada: llegadas[c.id],
+                      direccion: c.direccion || null,
+                    }));
+                    const { error } = await supabase.from('historial_clientes').insert(rows);
+                    if (error) throw error;
+                    mostrarToast(`✅ ${conLlegada.length} llegada(s) guardadas en historial`, 'success');
+                  } catch (err) {
+                    mostrarToast(`❌ Error: ${err.message}`, 'error');
+                  }
+                }
+              });
             }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-semibold text-sm transition-all duration-150"
-            style={{ background: 'var(--bg-raised)', border: '1px solid var(--border)', color: 'var(--text-2)' }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '0.8'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+            className="flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg font-semibold text-sm transition-all duration-150 hover:bg-blue-600 active:scale-95 shadow-sm"
             title="Guardar llegadas del día en el historial"
           >
-            <Archive size={16} />
+            <Archive size={15} strokeWidth={2} />
             Guardar en Historial
           </button>
           <button
@@ -1729,21 +2010,16 @@ function PantallaClientes() {
       <div className="flex gap-3 flex-wrap mb-4">
         <input
           type="text"
-          placeholder="Buscar cliente o dirección..."
+          placeholder="Buscar por cliente, dirección o chofer..."
           value={busquedaCliente}
           onChange={(e) => setBusquedaCliente(e.target.value)}
           className="theme-input flex-1 min-w-[200px] px-3 py-2 rounded-lg text-sm outline-none"
         />
-        <select
+        <ChoferDropdown
+          choferes={choferes}
           value={filtroChofer}
-          onChange={(e) => setFiltroChofer(e.target.value)}
-          className="theme-input px-3 py-2 rounded-lg text-sm cursor-pointer outline-none"
-        >
-          <option value="Todos">Todos los choferes</option>
-          {choferes.map(ch => (
-            <option key={ch.id} value={ch.nombre}>{ch.nombre}</option>
-          ))}
-        </select>
+          onChange={setFiltroChofer}
+        />
         {(filtroChofer !== 'Todos' || busquedaCliente) && (
           <button
             onClick={() => { setFiltroChofer('Todos'); setBusquedaCliente(''); }}
@@ -1797,18 +2073,11 @@ function PantallaClientes() {
                   >
                     <td className="px-6 py-4 text-sm font-medium" style={{ color: 'var(--text-1)' }}>{cliente.cliente || 'N/A'}</td>
                     <td className="px-6 py-4 text-sm">
-                      <select
+                      <ChoferComboboxRow
                         value={cliente.chofer || ''}
-                        onChange={(e) => handleChangeChofer(cliente.id, e.target.value)}
-                        className="theme-input px-2.5 py-1.5 rounded text-sm cursor-pointer outline-none"
-                      >
-                        <option value="">Seleccionar chofer...</option>
-                        {choferes.map(chofer => (
-                          <option key={chofer.id || chofer.nombre} value={chofer.nombre}>
-                            {chofer.nombre}
-                          </option>
-                        ))}
-                      </select>
+                        choferes={choferes}
+                        onChange={(nombre) => handleChangeChofer(cliente.id, nombre)}
+                      />
                     </td>
                     <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-2)' }}>{cliente.Choferes?.celular || 'Sin celular'}</td>
                     <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-2)' }}>{cliente.horario || 'N/A'}</td>
@@ -1816,20 +2085,17 @@ function PantallaClientes() {
                     {/* LLEGADA */}
                     <td className="px-4 py-4 text-sm text-center">
                       {llegadas[cliente.id] ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold"
-                            style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b98140' }}>
-                            <Clock size={11} />
-                            {llegadas[cliente.id]}
-                          </span>
-                          <button
-                            onClick={() => setLlegadas(prev => { const n = { ...prev }; delete n[cliente.id]; return n; })}
-                            className="text-xs"
-                            style={{ color: 'var(--text-3)', background: 'none', border: 'none', cursor: 'pointer', fontSize: '10px' }}
-                          >
-                            ✕ quitar
-                          </button>
-                        </div>
+                        <span
+                          onClick={() => setLlegadas(prev => { const n = { ...prev }; delete n[cliente.id]; return n; })}
+                          title="Click para quitar"
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold cursor-pointer select-none"
+                          style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b98140', transition: 'background 0.15s, color 0.15s, border-color 0.15s' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = '#ef444418'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef444440'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = '#10b98120'; e.currentTarget.style.color = '#10b981'; e.currentTarget.style.borderColor = '#10b98140'; }}
+                        >
+                          <Clock size={11} />
+                          {llegadas[cliente.id]}
+                        </span>
                       ) : (
                         <button
                           onClick={() => {
@@ -1884,6 +2150,20 @@ function PantallaClientes() {
           )}
         </div>
       </div>
+
+      <ModalConfirmacion
+        isOpen={confirmConfig.isOpen}
+        titulo={confirmConfig.titulo}
+        mensaje={confirmConfig.mensaje}
+        textoConfirmar={confirmConfig.textoConfirmar}
+        isDanger={confirmConfig.isDanger}
+        tema={theme}
+        onConfirm={() => {
+          if (confirmConfig.accion) confirmConfig.accion();
+          setConfirmConfig(p => ({ ...p, isOpen: false }));
+        }}
+        onCancel={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+      />
     </div>
   );
 }
@@ -1933,6 +2213,10 @@ function CeldaLocalidadEditable({ item, colors, zoneColor, onSave }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.target.blur(); }
           if (e.key === 'Escape') { setValor(item.localidad); setEditando(false); }
+          if (e.key === 'Backspace' && valor === item.localidad) {
+            e.preventDefault();
+            setValor('');
+          }
         }}
         style={{
           width: '100%',
@@ -2077,37 +2361,37 @@ function SortableFilaLocalidad({
         />
       </td>
 
-      {/* INPUT ID CHOFER */}
+      {/* ID CHOFER — AHORA PROTEGIDO (INFO SENSIBLE) */}
       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-        <input
-          type="number"
-          value={item.idChofer || ''}
-          placeholder="ID"
-          onChange={(e) => guardarCambioBD(item.id, 'idChofer', parseInt(e.target.value) || 0)}
-          style={{
-            padding: '5px 6px',
-            border: `1px solid ${colors.borderLight}`,
-            borderRadius: '6px',
-            backgroundColor: colors.inputBg,
-            color: colors.textPrimary,
-            fontSize: '13px',
-            fontWeight: '600',
-            outline: 'none',
-            cursor: 'text',
-            width: '58px',
-            textAlign: 'center',
-            transition: 'all 0.2s ease',
-          }}
-          onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
-          onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
-        />
+        <div style={{
+          padding: '6px 10px',
+          backgroundColor: colors.rowAlt,
+          color: colors.textSecondary,
+          fontSize: '12px',
+          fontWeight: '700',
+          borderRadius: '6px',
+          border: `1px solid ${colors.border}`,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: '40px',
+          opacity: 0.9,
+          letterSpacing: '0.5px'
+        }} title="ID del Chofer (Info Sensible - No editable manualmente)">
+          {item.idChofer || '—'}
+        </div>
       </td>
 
-      {/* NOMBRE CHOFER */}
-      <td style={{ padding: '10px 8px', textAlign: 'center', fontWeight: '600', color: colors.textPrimary }}>
-        <div style={{ backgroundColor: `${zoneColor}15`, padding: '3px 8px', borderRadius: '6px', fontSize: '12px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {obtenerNombreChofer(item.idChofer)}
-        </div>
+      {/* NOMBRE CHOFER CON AUTOCOMPLETE */}
+      <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+        <ChoferComboboxRow 
+          value={obtenerNombreChofer(item.idChofer) === '—' ? '' : obtenerNombreChofer(item.idChofer)}
+          choferes={choferes}
+          onChange={(nombre) => {
+            const ch = choferes.find(c => c.nombre === nombre);
+            guardarCambioBD(item.id, 'idChofer', ch ? ch.id : 0);
+          }}
+        />
       </td>
 
       {/* PQTE DÍA */}
@@ -2116,6 +2400,12 @@ function SortableFilaLocalidad({
           type="number"
           value={item.pqteDia || ''}
           onChange={(e) => guardarCambioBD(item.id, 'pqteDia', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.pqteDia && String(e.target.value) === String(item.pqteDia)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'pqteDia', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '62px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -2128,6 +2418,12 @@ function SortableFilaLocalidad({
           type="number"
           value={item.porFuera || ''}
           onChange={(e) => guardarCambioBD(item.id, 'porFuera', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.porFuera && String(e.target.value) === String(item.porFuera)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'porFuera', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '62px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -2140,6 +2436,12 @@ function SortableFilaLocalidad({
           type="number"
           value={item.entregados || ''}
           onChange={(e) => guardarCambioBD(item.id, 'entregados', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && item.entregados && String(e.target.value) === String(item.entregados)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'entregados', 0);
+            }
+          }}
           style={{ ...inputStyle, width: '62px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -2152,6 +2454,12 @@ function SortableFilaLocalidad({
           type="number"
           value={entregadosFuera || ''}
           onChange={(e) => guardarCambioBD(item.id, 'entregadosFuera', e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Backspace' && entregadosFuera && String(e.target.value) === String(entregadosFuera)) {
+              e.preventDefault();
+              guardarCambioBD(item.id, 'entregadosFuera', 0);
+            }
+          }}
           style={{ padding: '6px 8px', border: `1px solid ${colors.borderLight}`, borderRadius: '6px', backgroundColor: colors.inputBg, color: '#f59e0b', fontSize: '13px', fontWeight: '600', outline: 'none', textAlign: 'center', transition: 'all 0.2s ease', width: '62px' }}
           onFocus={(e) => { e.target.style.borderColor = '#f59e0b'; e.target.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.2)'; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
@@ -2221,6 +2529,7 @@ function PantallaHistorial() {
   const [histRecorridos, setHistRecorridos] = useState([]);
   const [histClientes, setHistClientes] = useState([]);
   const [loadingHist, setLoadingHist] = useState(true);
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, titulo: '', mensaje: '', textoConfirmar: '', isDanger: false, accion: null });
   const [filtroDia, setFiltroDia] = useState('TODOS');
   const [filtroFecha, setFiltroFecha] = useState('');
 
@@ -2370,11 +2679,45 @@ function PantallaHistorial() {
     <div style={{ padding: '24px', backgroundColor: bg, minHeight: '100vh' }}>
       {/* TÍTULO */}
       <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-          <BookOpen size={28} color={theme === 'light' ? '#8b5cf6' : '#a78bfa'} strokeWidth={2} />
-          <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700', color: textPrimary }}>
-            Historial Rec & Col
-          </h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <BookOpen size={28} color={theme === 'light' ? '#8b5cf6' : '#a78bfa'} strokeWidth={2} />
+            <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700', color: textPrimary }}>
+              Historial Rec & Col
+            </h1>
+          </div>
+          {/* BORRAR HISTORIAL */}
+          <button
+            className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg font-semibold text-sm transition-all duration-150 hover:bg-red-600 active:scale-95 shadow-sm"
+            onClick={async () => {
+              setConfirmConfig({
+                isOpen: true,
+                titulo: 'Borrar Historial',
+                mensaje: '⚠️ ¿Borrar TODO el historial? Esta acción no se puede deshacer.',
+                textoConfirmar: 'Borrar Historial',
+                isDanger: true,
+                accion: async () => {
+                  try {
+                    const [{ error: e1 }, { error: e2 }] = await Promise.all([
+                      supabase.from('historial_recorridos').delete().neq('id', 0),
+                      supabase.from('historial_clientes').delete().neq('id', 0),
+                    ]);
+                    if (e1) throw e1;
+                    if (e2) throw e2;
+                    setHistRecorridos([]);
+                    setHistClientes([]);
+                    mostrarToast('🗑️ Historial completo borrado', 'success');
+                  } catch (err) {
+                    mostrarToast(`❌ Error: ${err.message}`, 'error');
+                  }
+                }
+              });
+            }}
+            title="Borrar todo el historial"
+          >
+            <Trash2 size={15} strokeWidth={2} />
+            Borrar Historial
+          </button>
         </div>
         <p style={{ margin: 0, fontSize: '14px', color: textSecondary }}>
           Registro histórico diario de recorridos y llegadas de clientes
@@ -2582,6 +2925,20 @@ function PantallaHistorial() {
           </div>
         )
       )}
+
+      <ModalConfirmacion
+        isOpen={confirmConfig.isOpen}
+        titulo={confirmConfig.titulo}
+        mensaje={confirmConfig.mensaje}
+        textoConfirmar={confirmConfig.textoConfirmar}
+        isDanger={confirmConfig.isDanger}
+        tema={theme}
+        onConfirm={() => {
+          if (confirmConfig.accion) confirmConfig.accion();
+          setConfirmConfig(p => ({ ...p, isOpen: false }));
+        }}
+        onCancel={() => setConfirmConfig(p => ({ ...p, isOpen: false }))}
+      />
     </div>
   );
 }

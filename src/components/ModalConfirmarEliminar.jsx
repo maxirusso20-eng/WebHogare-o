@@ -55,9 +55,8 @@ const ModalConfirmarEliminarComponent = ({
           position: 'absolute',
           inset: 0,
           backgroundColor: colors.overlay,
-
-
         }}
+        onMouseDown={(e) => { e.stopPropagation(); onCancel(); }}
       />
 
       {/* MODAL */}

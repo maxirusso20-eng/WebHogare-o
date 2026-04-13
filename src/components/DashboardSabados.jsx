@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from './supabase';
+import { supabase } from '../supabase';
 import { CalendarDays, Truck, Package, Plus, MapPin, Trash2, GripVertical, CheckCircle, AlertCircle } from 'lucide-react';
 import {
   DndContext,
@@ -240,15 +240,15 @@ export function DashboardSabados({ theme, mostrarToast }) {
   // ── Colores según tema ───────────────────────────────────────
   const colors = {
     backgroundColor: theme === 'light' ? '#f8fafc' : '#020617',
-    cardBg:          theme === 'light' ? '#ffffff'  : '#1e293b',
-    headerBg:        theme === 'light' ? '#f1f5f9'  : '#0f172a',
-    textPrimary:     theme === 'light' ? '#1e293b'  : '#f8fafc',
-    textSecondary:   theme === 'light' ? '#64748b'  : '#cbd5e1',
-    border:          theme === 'light' ? '#e2e8f0'  : '#334155',
-    borderLight:     theme === 'light' ? '#cbd5e1'  : '#475569',
-    rowAlt:          theme === 'light' ? '#f9fafb'  : '#141e2e',
-    inputBg:         theme === 'light' ? '#f8fafc'  : '#0f172a',
-    inputFocusBg:    theme === 'light' ? '#ffffff'  : '#1a2540',
+    cardBg: theme === 'light' ? '#ffffff' : '#1e293b',
+    headerBg: theme === 'light' ? '#f1f5f9' : '#0f172a',
+    textPrimary: theme === 'light' ? '#1e293b' : '#f8fafc',
+    textSecondary: theme === 'light' ? '#64748b' : '#cbd5e1',
+    border: theme === 'light' ? '#e2e8f0' : '#334155',
+    borderLight: theme === 'light' ? '#cbd5e1' : '#475569',
+    rowAlt: theme === 'light' ? '#f9fafb' : '#141e2e',
+    inputBg: theme === 'light' ? '#f8fafc' : '#0f172a',
+    inputFocusBg: theme === 'light' ? '#ffffff' : '#1a2540',
   };
 
   // Color fijo para sábados: naranja/ámbar
@@ -374,16 +374,16 @@ export function DashboardSabados({ theme, mostrarToast }) {
   const getPercentageColor = (pct) => {
     const n = parseFloat(pct);
     if (n >= 100) return '#10b981';
-    if (n >= 80)  return '#06b6d4';
-    if (n >= 50)  return '#f59e0b';
+    if (n >= 80) return '#06b6d4';
+    if (n >= 50) return '#f59e0b';
     return '#64748b';
   };
 
   // ── Stats ────────────────────────────────────────────────────
-  const totalPaquetes   = recorridos.reduce((s, r) => s + (r.pqteDia || 0) + (r.porFuera || 0), 0);
+  const totalPaquetes = recorridos.reduce((s, r) => s + (r.pqteDia || 0) + (r.porFuera || 0), 0);
   const totalEntregados = recorridos.reduce((s, r) => s + (r.entregados || 0), 0);
-  const pctGlobal       = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : '0.0';
-  const rutasSinChofer  = recorridos.filter(r => !r.idChofer || r.idChofer === 0);
+  const pctGlobal = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : '0.0';
+  const rutasSinChofer = recorridos.filter(r => !r.idChofer || r.idChofer === 0);
 
   if (loading) {
     return (

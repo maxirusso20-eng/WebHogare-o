@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen } from 'lucide-react';
+import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck } from 'lucide-react';
 import '../styles/sidebar.css';
+
+import { supabase } from '../supabase';
 
 export function Sidebar({
   currentPage,
@@ -8,7 +10,10 @@ export function Sidebar({
   theme,
   toggleTheme,
   isMobileOpen,
-  setIsMobileOpen
+  setIsMobileOpen,
+  isAdmin,
+  isSuperAdmin,
+  unreadCount = 0,
 }) {
   const [isCollapsed, setIsCollapsed] = useState(() => {
     // Cargar estado del sidebar desde localStorage
@@ -54,14 +59,21 @@ export function Sidebar({
 
   // Si estamos en móvil, mostrar antes de navItems
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'clientes', label: 'Clientes', icon: UsersRound },
-    { id: 'choferes', label: 'Choferes', icon: CarFront },
-    { id: 'recorridos', label: 'Recorridos', icon: Route },
-    { id: 'historial', label: 'Historial', icon: BookOpen },
-    { id: 'maps', label: 'Maps', icon: Globe },
+  const allNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, alwaysVisible: true },
+    { id: 'clientes', label: 'Clientes', icon: UsersRound, alwaysVisible: false },
+    { id: 'choferes', label: 'Choferes', icon: CarFront, alwaysVisible: false },
+    { id: 'recorridos', label: 'Recorridos', icon: Route, alwaysVisible: true },
+    { id: 'historial', label: 'Historial', icon: BookOpen, alwaysVisible: false },
+    { id: 'maps', label: 'Maps', icon: Globe, alwaysVisible: true },
+    { id: 'chat', label: 'Chat', icon: MessageSquare, alwaysVisible: true },
   ];
+
+  if (isSuperAdmin) {
+    allNavItems.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, alwaysVisible: false });
+  }
+
+  const navItems = allNavItems.filter(item => isAdmin || item.alwaysVisible);
 
   const iconVolumeShadow =
     theme === 'light'
@@ -101,10 +113,11 @@ export function Sidebar({
           <div className="nav-links">
             {navItems.map((item) => {
               const NavIcon = item.icon;
+              const showBadge = item.id === 'chat' && unreadCount > 0;
               return (
                 <button
                   key={item.id}
-                  className={`nav-link transition-all duration-200 hover:scale-105 ${currentPage === item.id ? 'active' : ''}`}
+                  className={`nav-link ${currentPage === item.id ? 'active' : ''}`}
                   onClick={() => {
                     setCurrentPage(item.id);
                     setIsMobileOpen(false);
@@ -113,9 +126,22 @@ export function Sidebar({
                 >
                   <span
                     className="nav-icon inline-flex items-center justify-center"
-                    style={{ filter: iconVolumeShadow }}
+                    style={{ filter: iconVolumeShadow, position: 'relative' }}
                   >
                     {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
+                    {showBadge && (
+                      <span style={{
+                        position: 'absolute', top: '-5px', right: '-6px',
+                        background: '#ef4444', color: '#fff',
+                        fontSize: '10px', fontWeight: '800',
+                        borderRadius: '10px', padding: '1px 5px',
+                        minWidth: '16px', textAlign: 'center', lineHeight: '14px',
+                        border: `2px solid ${theme === 'light' ? '#fff' : '#0f172a'}`,
+                        animation: 'badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                      }}>
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
                   </span>
                   <span className="nav-label">{item.label}</span>
                   {currentPage === item.id && (
@@ -140,6 +166,18 @@ export function Sidebar({
                 {theme === 'light' ? 'Claro' : 'Oscuro'}
               </span>
             </div>
+
+            <button
+              onClick={() => supabase.auth.signOut()}
+              style={{
+                marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                width: '100%', padding: '12px', background: 'transparent', border: `1px solid ${theme === 'light' ? '#ef444450' : '#ef444450'}`,
+                color: '#ef4444', borderRadius: '12px', fontWeight: '600', cursor: 'pointer',
+              }}
+            >
+              <LogOut size={18} />
+              Cerrar sesión
+            </button>
           </div>
         </nav>
       </>
@@ -150,48 +188,67 @@ export function Sidebar({
   return (
     <nav
       className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'} theme-${theme}`}
-      onMouseEnter={() => { if (isCollapsed) setIsCollapsed(false); }}
-      onMouseLeave={() => { if (!isCollapsed) setIsCollapsed(true); }}
     >
-      {/* HEADER DEL SIDEBAR DESKTOP - Abierto/Cerrado */}
-      <div className={`sidebar-toggle ${!isCollapsed ? 'sidebar-header-open' : ''}`}>
-        {!isCollapsed && (
-          <div className="sidebar-brand-text">
-            <span className="brand-icon-desk">📦</span>
-            <h2 className="brand-text-desk">Hogareño</h2>
-          </div>
-        )}
+      {/* HEADER DEL SIDEBAR DESKTOP */}
+      <div className="sidebar-toggle sidebar-header-open">
+        <div className="sidebar-brand-text">
+          <span className="brand-icon-desk">📦</span>
+          <h2 className="brand-text-desk">Hogareño</h2>
+        </div>
         <button
           className="hamburger-btn"
           onClick={() => setIsCollapsed(!isCollapsed)}
           aria-label="Toggle sidebar"
           title={isCollapsed ? 'Abrir menú' : 'Cerrar menú'}
         >
-          {isCollapsed ? <Menu size={24} /> : <X size={24} />}
+          <span className="icon-menu"><Menu size={24} /></span>
+          <span className="icon-close"><X size={24} /></span>
         </button>
       </div>
 
       {/* NAVEGACIÓN */}
       <div className="nav-links">
+        <style>{`
+          @keyframes badgePop {
+            from { transform: scale(0); opacity: 0; }
+            to   { transform: scale(1); opacity: 1; }
+          }
+          @keyframes badgePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+            50%       { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
+          }
+        `}</style>
         {navItems.map((item) => {
           const NavIcon = item.icon;
+          const showBadge = item.id === 'chat' && unreadCount > 0;
           return (
             <button
               key={item.id}
-              className={`nav-link transition-all duration-200 hover:scale-105 ${currentPage === item.id ? 'active' : ''}`}
+              className={`nav-link ${currentPage === item.id ? 'active' : ''}`}
               onClick={() => setCurrentPage(item.id)}
               title={item.label}
             >
               <span
                 className="nav-icon inline-flex items-center justify-center"
-                style={{ filter: iconVolumeShadow }}
+                style={{ filter: iconVolumeShadow, position: 'relative' }}
               >
                 {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
+                {showBadge && (
+                  <span style={{
+                    position: 'absolute', top: '-5px', right: '-7px',
+                    background: '#ef4444', color: '#fff',
+                    fontSize: '10px', fontWeight: '800',
+                    borderRadius: '10px', padding: '1px 5px',
+                    minWidth: '16px', textAlign: 'center', lineHeight: '14px',
+                    border: `2px solid ${theme === 'light' ? '#fff' : '#0f172a'}`,
+                    animation: 'badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1), badgePulse 2s 0.3s ease-in-out infinite',
+                  }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
               </span>
               <span className="nav-label">{item.label}</span>
-              {currentPage === item.id && (
-                <span className="nav-indicator"></span>
-              )}
+              <span className="nav-indicator"></span>
             </button>
           );
         })}
@@ -199,45 +256,43 @@ export function Sidebar({
 
       {/* FOOTER DEL SIDEBAR DESKTOP */}
       <div className="sidebar-footer">
-        <div className={`theme-switcher ${isCollapsed ? 'theme-collapsed' : 'theme-expanded'}`}>
-          {isCollapsed ? (
-            // Modo colapsado: Solo icono centrado del tema actual
-            <button
-              className="theme-icon-only"
-              onClick={() => toggleTheme()}
-              title={`Cambiar a ${theme === 'light' ? 'Oscuro' : 'Claro'}`}
-              aria-label="Toggle theme"
-            >
-              {theme === 'light' ? <Sun size={24} /> : <Moon size={24} />}
-            </button>
-          ) : (
-            // Modo expandido: Botones + selector deslizable
-            <>
-              <button
-                className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
-                onClick={toggleTheme}
-                title="Modo claro"
-                aria-label="Light mode"
-              >
-                <Sun size={20} />
-              </button>
-              <div className="theme-toggle-track">
-                <div className={`toggle-circle theme-${theme}`}></div>
-              </div>
-              <button
-                className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
-                onClick={toggleTheme}
-                title="Modo oscuro"
-                aria-label="Dark mode"
-              >
-                <Moon size={20} />
-              </button>
-            </>
-          )}
+        <div className="theme-switcher theme-expanded">
+          <button
+            className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
+            onClick={toggleTheme}
+            title="Modo claro"
+            aria-label="Light mode"
+          >
+            <Sun size={20} />
+          </button>
+          <div className="theme-toggle-track">
+            <div className={`toggle-circle theme-${theme}`}></div>
+          </div>
+          <button
+            className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
+            onClick={toggleTheme}
+            title="Modo oscuro"
+            aria-label="Dark mode"
+          >
+            <Moon size={20} />
+          </button>
         </div>
-        {!isCollapsed && (
-          <p className="theme-label">{theme === 'light' ? 'Claro' : 'Oscuro'}</p>
-        )}
+        <p className="theme-label" style={{ marginBottom: '16px' }}>{theme === 'light' ? 'Claro' : 'Oscuro'}</p>
+
+        <button
+          onClick={() => supabase.auth.signOut()}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'flex-start', gap: '8px',
+            width: '100%', padding: isCollapsed ? '12px 0' : '12px 16px', background: 'transparent',
+            border: `1px solid ${theme === 'light' ? '#ef444430' : '#ef444430'}`,
+            color: '#ef4444', borderRadius: '12px', fontWeight: '600', cursor: 'pointer',
+            transition: 'all 0.2s'
+          }}
+          title="Cerrar sesión"
+        >
+          <LogOut size={20} />
+          {!isCollapsed && <span>Cerrar sesión</span>}
+        </button>
       </div>
     </nav>
   );

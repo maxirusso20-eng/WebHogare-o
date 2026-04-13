@@ -1,20 +1,48 @@
 /* ════════════════════════════════════════════════════════════════
    ESTILOS DEL SIDEBAR COLAPSABLE - VERSIÓN DESKTOP
-   v3.0 — Polished, GPU-accelerated transitions
+   v4.0 — CSS-only hover, GPU compositor animations (no width transition)
    ════════════════════════════════════════════════════════════════ */
 
+/* ═══ VARIABLES ════════════════════════════════════════════════ */
 .sidebar {
+  --sb-width-expanded: 240px;
+  --sb-width-collapsed: 72px;
+  --sb-duration: 220ms;
+  --sb-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: #f3f4f6;
-  border-right: 1px solid #e5e7eb;
-  transition:
-    width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  width: var(--sb-width-collapsed);
+  border-right: 1px solid transparent;
   overflow: hidden;
   position: relative;
-  z-index: 100;
+  z-index: 500;
+  /* Sólo animar width con will-change y usamos transition solo en esta prop */
+  transition:
+    width var(--sb-duration) var(--sb-ease),
+    background 200ms ease,
+    border-color 200ms ease;
   will-change: width;
+  /* Fuerza compositing layer para que el browser no haga layout en el panel derecho */
+  transform: translateZ(0);
+}
+
+/* Estado expandido: ancho completo */
+.sidebar.expanded {
+  width: var(--sb-width-expanded);
+  box-shadow: 3px 0 20px rgba(0,0,0,0.12);
+}
+
+/* Estado colapsado: hover expande */
+.sidebar.collapsed {
+  width: var(--sb-width-collapsed);
+  box-shadow: none;
+}
+
+.sidebar.collapsed:hover {
+  width: var(--sb-width-expanded);
+  box-shadow: 3px 0 20px rgba(0,0,0,0.12);
 }
 
 /* ─── MODO CLARO ───────────────────────────────────────────── */
@@ -29,15 +57,6 @@
   border-right-color: #1e293b;
 }
 
-/* ─── ANCHO DEL SIDEBAR ───────────────────────────────────── */
-.sidebar.expanded {
-  width: 280px;
-}
-
-.sidebar.collapsed {
-  width: 90px;
-}
-
 /* ════════════════════════════════════════════════════════════════
    HEADER DEL SIDEBAR
    ════════════════════════════════════════════════════════════════ */
@@ -46,17 +65,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 8px;
+  padding: 0 14px;
   border-bottom: 1px solid;
   min-height: 56px;
-  transition:
-    padding 0.28s cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 150ms ease;
-}
-
-.sidebar-toggle.sidebar-header-open {
-  justify-content: space-between;
-  padding: 12px 16px;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .sidebar.theme-light .sidebar-toggle {
@@ -69,36 +82,48 @@
   background-color: rgba(15, 23, 42, 0.6);
 }
 
-/* ─── BRAND TEXT EN HEADER ABIERTO ───────────────────────── */
+/* sidebar-header-open: expanded state — brand + hamburger */
+.sidebar-toggle.sidebar-header-open {
+  justify-content: center;
+  padding: 0 14px;
+}
+
+/* ─── BRAND TEXT ─────────────────────────────────────────── */
 .sidebar-brand-text {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  transition:
+    flex var(--sb-duration) var(--sb-ease),
+    width var(--sb-duration) var(--sb-ease);
 }
 
 .brand-icon-desk {
-  font-size: 24px;
+  font-size: 22px;
   flex-shrink: 0;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 280ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .sidebar-toggle:hover .brand-icon-desk {
-  transform: scale(1.15) rotate(-5deg);
+  transform: scale(1.12) rotate(-5deg);
 }
 
 .brand-text-desk {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
   white-space: nowrap;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  transition: letter-spacing 150ms ease;
+  letter-spacing: -0.4px;
+  /* Fade + slide — compositor-only */
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity var(--sb-duration) var(--sb-ease),
+    transform var(--sb-duration) var(--sb-ease);
 }
 
 .sidebar.theme-light .brand-text-desk {
@@ -115,6 +140,73 @@
   background-clip: text;
 }
 
+/* Ocultar brand text cuando colapsado y no hover */
+.sidebar.collapsed:not(:hover) .brand-text-desk {
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+}
+
+/* Colapsar el contenedor brand completo para que el hamburger pueda centrarse */
+.sidebar.collapsed:not(:hover) .sidebar-brand-text {
+  flex: 0;
+  width: 0;
+  overflow: hidden;
+  gap: 0;
+  padding: 0;
+  margin: 0;
+}
+
+/* ─── ÍCONOS HAMBURGER / CLOSE ───────────────────────────── */
+.icon-menu,
+.icon-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+/* Por defecto (expanded): mostrar X, ocultar Menu */
+.sidebar.expanded .icon-menu {
+  opacity: 0;
+  transform: scale(0.7) rotate(-90deg);
+  position: absolute;
+  pointer-events: none;
+}
+
+.sidebar.expanded .icon-close {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+/* Colapsado: mostrar Menu, ocultar X */
+.sidebar.collapsed .icon-menu {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  position: static;
+}
+
+.sidebar.collapsed .icon-close {
+  opacity: 0;
+  transform: scale(0.7) rotate(90deg);
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Colapsado + hover: mostrar X */
+.sidebar.collapsed:hover .icon-menu {
+  opacity: 0;
+  transform: scale(0.7) rotate(-90deg);
+  position: absolute;
+  pointer-events: none;
+}
+
+.sidebar.collapsed:hover .icon-close {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+  position: static;
+}
+
 /* ─── BOTÓN HAMBURGUESA ───────────────────────────────────── */
 .hamburger-btn {
   background: none;
@@ -125,29 +217,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   transition:
-    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1),
     background-color 150ms ease,
     color 150ms ease;
   flex-shrink: 0;
-  will-change: transform;
 }
 
-.sidebar.theme-light .hamburger-btn {
-  color: #64748b;
-}
-
-.sidebar.theme-dark .hamburger-btn {
-  color: #cbd5e1;
-}
+.sidebar.theme-light .hamburger-btn { color: #64748b; }
+.sidebar.theme-dark .hamburger-btn { color: #cbd5e1; }
 
 .hamburger-btn:hover {
-  transform: scale(1.12) rotate(10deg);
+  transform: scale(1.1);
 }
 
 .hamburger-btn:active {
-  transform: scale(0.95);
-  transition-duration: 80ms;
+  transform: scale(0.93);
 }
 
 .sidebar.theme-light .hamburger-btn:hover {
@@ -167,31 +253,33 @@
 .nav-links {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 12px;
+  gap: 3px;
+  padding: 10px 8px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .nav-link {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 12px;
+  padding: 10px 10px;
   border: none;
   border-radius: 10px;
   cursor: pointer;
-  transition:
-    transform 180ms cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 150ms ease,
-    color 150ms ease,
-    border-color 150ms ease,
-    box-shadow 150ms ease;
   position: relative;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  will-change: transform;
+  overflow: hidden;
+  min-width: 0;
+  /* Compositor-only: solo transform y opacity */
+  transition:
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 160ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ─── MODO CLARO ─────────────────────────────────────────── */
@@ -203,7 +291,7 @@
 .sidebar.theme-light .nav-link:hover:not(.active) {
   background-color: #e2e8f0;
   color: #3b82f6;
-  transform: translateX(5px);
+  transform: translateX(4px);
 }
 
 .sidebar.theme-light .nav-link.active {
@@ -225,7 +313,7 @@
   background-color: rgba(30, 41, 59, 0.7);
   color: #94a3b8;
   border-color: rgba(148, 163, 184, 0.25);
-  transform: translateX(5px);
+  transform: translateX(4px);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -238,17 +326,18 @@
     0 2px 12px rgba(59, 130, 246, 0.2);
 }
 
-/* Ripple on click */
 .nav-link:active {
   transform: translateX(2px) scale(0.98);
-  transition-duration: 80ms;
+  transition-duration: 70ms;
 }
 
 /* ─── ICONO DE NAVEGACIÓN ───────────────────────────────────── */
 .nav-icon {
-  font-size: 20px;
   flex-shrink: 0;
-  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .nav-link:hover .nav-icon {
@@ -256,7 +345,7 @@
 }
 
 .nav-link.active .nav-icon {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 /* ─── ETIQUETA DE NAVEGACIÓN ────────────────────────────────── */
@@ -266,38 +355,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: 700;
-  font-size: 15px;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  /* Transiciones suaves de aparición */
+  font-size: 14px;
+  letter-spacing: -0.3px;
   opacity: 1;
-  max-width: 160px;
+  transform: translateX(0);
   transition:
-    opacity 0.22s cubic-bezier(0.4, 0, 0.2, 1),
-    max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    letter-spacing 150ms ease;
-}
-
-/* Colapso: ocultar label con fade + ancho */
-.sidebar.collapsed .nav-label {
-  opacity: 0;
-  max-width: 0;
-  overflow: hidden;
-}
-
-/* Colapso: centrar ícono y eliminar gap */
-.sidebar.collapsed .nav-link {
-  justify-content: center;
-  gap: 0;
-}
-
-/* Colapso: ocultar indicador activo */
-.sidebar.collapsed .nav-indicator {
-  opacity: 0 !important;
-  transform: translateY(-50%) scaleY(0) !important;
+    opacity var(--sb-duration) var(--sb-ease),
+    transform var(--sb-duration) var(--sb-ease),
+    flex var(--sb-duration) var(--sb-ease),
+    width var(--sb-duration) var(--sb-ease);
+  pointer-events: none;
 }
 
 .sidebar.theme-light .nav-label {
@@ -307,9 +374,30 @@
   background-clip: text;
 }
 
-.nav-link:hover .nav-label,
-.nav-link:focus-visible .nav-label {
-  letter-spacing: 0px;
+.sidebar.theme-dark .nav-label {
+  background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Ocultar label cuando colapsado y sin hover */
+.sidebar.collapsed:not(:hover) .nav-label {
+  opacity: 0;
+  flex: 0;
+  width: 0;
+  overflow: hidden;
+  transform: translateX(-6px);
+  padding: 0;
+  margin: 0;
+}
+
+/* Centrar icono cuando colapsado y sin hover */
+.sidebar.collapsed:not(:hover) .nav-link {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  gap: 0;
 }
 
 /* ─── INDICADOR ACTIVO ───────────────────────────────────── */
@@ -319,14 +407,15 @@
   top: 50%;
   transform: translateY(-50%) scaleY(0);
   width: 4px;
-  height: 24px;
+  height: 22px;
   border-radius: 2px 0 0 2px;
   background: linear-gradient(180deg, #3b82f6, #0284c7);
   transform-origin: center;
   transition:
-    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
     opacity 150ms ease;
   opacity: 0;
+  pointer-events: none;
 }
 
 .nav-link.active .nav-indicator {
@@ -334,105 +423,68 @@
   opacity: 1;
 }
 
+/* Ocultar indicador cuando colapsado y sin hover */
+.sidebar.collapsed:not(:hover) .nav-indicator {
+  opacity: 0 !important;
+  transform: translateY(-50%) scaleY(0) !important;
+}
+
 /* ════════════════════════════════════════════════════════════════
    FOOTER — THEME SWITCHER
    ════════════════════════════════════════════════════════════════ */
 
 .sidebar-footer {
-  padding: 16px;
+  padding: 12px;
   border-top: 1px solid;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  transition: border-color 150ms ease;
+  gap: 6px;
+  overflow: hidden;
 }
 
-.sidebar.theme-light .sidebar-footer {
-  border-top-color: #cbd5e1;
-}
+.sidebar.theme-light .sidebar-footer { border-top-color: #cbd5e1; }
+.sidebar.theme-dark .sidebar-footer { border-top-color: #1e293b; }
 
-.sidebar.theme-dark .sidebar-footer {
-  border-top-color: #1e293b;
-}
-
-/* ─── MODO EXPANDIDO ────────────────────────────────────── */
-.theme-expanded {
+/* ─── THEME SWITCHER DESKTOP ─────────────────────────────── */
+.theme-switcher {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background-color: transparent;
+  gap: 6px;
   border-radius: 50px;
   padding: 4px;
-  position: relative;
   width: 100%;
   max-width: 180px;
-  transition: background-color 200ms ease;
+  transition: background-color 180ms ease;
 }
 
-.sidebar.theme-light .theme-expanded {
-  background-color: #e2e8f0;
+.theme-expanded {
+  background-color: transparent;
 }
 
-.sidebar.theme-dark .theme-expanded {
-  background-color: rgba(30, 41, 59, 0.8);
-}
+.sidebar.theme-light .theme-expanded { background-color: #e2e8f0; }
+.sidebar.theme-dark .theme-expanded { background-color: rgba(30, 41, 59, 0.8); }
 
-/* ─── MODO COLAPSADO ────────────────────────────────────── */
-.theme-collapsed {
-  display: flex;
-  align-items: center;
+/* Ocultar y recentrar theme switcher contents cuando colapsado y sin hover */
+.sidebar.collapsed:not(:hover) .theme-switcher {
   justify-content: center;
-  width: 100%;
-  padding: 8px;
+  max-width: 52px;
+  background-color: transparent !important;
 }
 
-/* ─── ICONO ÚNICO (colapsado) ───────────────────────────── */
-.theme-icon-only {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 12px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    transform 250ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 150ms ease,
-    color 150ms ease;
-  flex-shrink: 0;
-  will-change: transform;
+.sidebar.collapsed:not(:hover) .theme-toggle-track,
+.sidebar.collapsed:not(:hover) .theme-label,
+.sidebar.collapsed:not(:hover) .theme-btn:last-child {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  pointer-events: none;
+  flex: 0;
 }
 
-.sidebar.theme-light .theme-icon-only {
-  color: #f59e0b;
-}
-
-.sidebar.theme-dark .theme-icon-only {
-  color: #60a5fa;
-}
-
-.theme-icon-only:hover {
-  transform: scale(1.18) rotate(-8deg);
-}
-
-.theme-icon-only:active {
-  transform: scale(0.95) rotate(-8deg);
-  transition-duration: 80ms;
-}
-
-.sidebar.theme-light .theme-icon-only:hover {
-  background-color: #fef3c7;
-  color: #d97706;
-}
-
-.sidebar.theme-dark .theme-icon-only:hover {
-  background-color: rgba(59, 130, 246, 0.2);
-  color: #93c5fd;
-}
-
-/* ─── BOTONES DE TEMA (expandido) ───────────────────────── */
+/* ─── BOTONES DE TEMA ────────────────────────────────────── */
 .theme-btn {
   background: none;
   border: none;
@@ -443,35 +495,19 @@
   align-items: center;
   justify-content: center;
   transition:
-    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 150ms ease,
-    color 150ms ease,
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    background-color 140ms ease,
+    color 140ms ease,
     opacity 150ms ease;
   flex: 1;
-  will-change: transform;
 }
 
-.sidebar.theme-light .theme-btn {
-  color: #94a3b8;
-}
+.sidebar.theme-light .theme-btn { color: #94a3b8; }
+.sidebar.theme-dark .theme-btn { color: #64748b; }
 
-.sidebar.theme-dark .theme-btn {
-  color: #64748b;
-}
-
-.theme-btn.active {
-  transform: scale(1.18);
-}
-
-.sidebar.theme-light .theme-btn.active {
-  color: #f59e0b;
-  background-color: #fef3c7;
-}
-
-.sidebar.theme-dark .theme-btn.active {
-  color: #60a5fa;
-  background-color: rgba(59, 130, 246, 0.2);
-}
+.theme-btn.active { transform: scale(1.15); }
+.sidebar.theme-light .theme-btn.active { color: #f59e0b; background-color: #fef3c7; }
+.sidebar.theme-dark .theme-btn.active { color: #60a5fa; background-color: rgba(59, 130, 246, 0.2); }
 
 .theme-btn:hover:not(.active) {
   opacity: 0.75;
@@ -479,68 +515,54 @@
 }
 
 .theme-btn:active {
-  transform: scale(0.95);
-  transition-duration: 80ms;
+  transform: scale(0.93);
+  transition-duration: 70ms;
 }
 
-/* ─── TOGGLE TRACK ───────────────────────────────────── */
+/* ─── TOGGLE TRACK ───────────────────────────────────────── */
 .theme-toggle-track {
   width: 2px;
-  height: 24px;
+  height: 22px;
   background: linear-gradient(180deg, #f59e0b 0%, #60a5fa 100%);
   border-radius: 1px;
   opacity: 0.3;
-  margin: 0 4px;
-  transition: opacity 200ms ease;
-}
-
-.theme-switcher:hover .theme-toggle-track {
-  opacity: 0.6;
+  margin: 0 2px;
+  flex-shrink: 0;
+  transition: opacity 180ms ease, width 180ms ease;
 }
 
 /* ─── ETIQUETA DE TEMA ─────────────────────────────────── */
 .theme-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   margin: 0;
-  margin-top: 4px;
-  transition: color 150ms ease, opacity 150ms ease;
+  transition:
+    opacity var(--sb-duration) var(--sb-ease),
+    transform var(--sb-duration) var(--sb-ease),
+    color 150ms ease;
+  white-space: nowrap;
 }
 
-.sidebar.theme-light .theme-label {
-  color: #64748b;
+.sidebar.collapsed:not(:hover) .theme-label {
+  opacity: 0;
+  transform: translateY(4px);
+  pointer-events: none;
 }
 
-.sidebar.theme-dark .theme-label {
-  color: #94a3b8;
-}
+.sidebar.theme-light .theme-label { color: #64748b; }
+.sidebar.theme-dark .theme-label { color: #94a3b8; }
 
 /* ════════════════════════════════════════════════════════════════
    SCROLLBAR
    ════════════════════════════════════════════════════════════════ */
 
-.nav-links::-webkit-scrollbar {
-  width: 4px;
-}
-
-.nav-links::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.nav-links::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 3px;
-}
-
-.sidebar.theme-dark .nav-links::-webkit-scrollbar-thumb {
-  background-color: #334155;
-}
-
-.nav-links::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
-}
+.nav-links::-webkit-scrollbar { width: 3px; }
+.nav-links::-webkit-scrollbar-track { background: transparent; }
+.nav-links::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 3px; }
+.sidebar.theme-dark .nav-links::-webkit-scrollbar-thumb { background-color: #334155; }
+.nav-links::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 
 /* ════════════════════════════════════════════════════════════════
    VERSIÓN MÓVIL — OVERLAY
@@ -548,47 +570,34 @@
 
 .sidebar-overlay-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  top: 0; left: 0; right: 0; bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 99;
-  animation: backdropFadeIn 0.22s ease-out forwards;
+  animation: backdropFadeIn 0.2s ease-out forwards;
   backdrop-filter: blur(1px);
   -webkit-backdrop-filter: blur(1px);
 }
 
 @keyframes backdropFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-/* ─── SIDEBAR MÓVIL ───────────────────────────────────── */
 .sidebar-mobile {
   position: fixed;
   top: 72px;
   left: 0;
   height: calc(100vh - 72px);
-  width: 280px;
+  width: 260px;
   z-index: 100;
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  transition: transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.28);
   will-change: transform;
+  transform: translateZ(0);
 }
 
-.sidebar-mobile.mobile-closed {
-  transform: translateX(-100%);
-}
-
-.sidebar-mobile.mobile-open {
-  transform: translateX(0);
-}
+.sidebar-mobile.mobile-closed { transform: translateX(-100%); }
+.sidebar-mobile.mobile-open  { transform: translateX(0); }
 
 /* ─── HEADER MÓVIL ───────────────────────────────────── */
 .sidebar-header-mobile {
@@ -600,35 +609,17 @@
   min-height: 56px;
 }
 
-.sidebar.theme-light .sidebar-header-mobile {
-  border-bottom-color: #cbd5e1;
-  background-color: #f8fafc;
-}
+.sidebar.theme-light .sidebar-header-mobile { border-bottom-color: #cbd5e1; background-color: #f8fafc; }
+.sidebar.theme-dark .sidebar-header-mobile { border-bottom-color: #1e293b; background-color: rgba(15, 23, 42, 0.6); }
 
-.sidebar.theme-dark .sidebar-header-mobile {
-  border-bottom-color: #1e293b;
-  background-color: rgba(15, 23, 42, 0.6);
-}
-
-.sidebar-brand-mobile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-icon-mobile {
-  font-size: 24px;
-}
+.sidebar-brand-mobile { display: flex; align-items: center; gap: 10px; }
+.brand-icon-mobile { font-size: 22px; }
 
 .brand-text-mobile {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  letter-spacing: -0.4px;
 }
 
 .sidebar.theme-light .brand-text-mobile {
@@ -655,39 +646,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 150ms ease,
-    color 150ms ease;
-  will-change: transform;
+  transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 140ms ease;
 }
 
-.sidebar.theme-light .close-btn-mobile {
-  color: #64748b;
-}
+.sidebar.theme-light .close-btn-mobile { color: #64748b; }
+.sidebar.theme-dark .close-btn-mobile { color: #cbd5e1; }
 
-.sidebar.theme-dark .close-btn-mobile {
-  color: #cbd5e1;
-}
-
-.close-btn-mobile:hover {
-  transform: scale(1.12) rotate(90deg);
-}
-
-.close-btn-mobile:active {
-  transform: scale(0.95) rotate(90deg);
-  transition-duration: 80ms;
-}
-
-.sidebar.theme-light .close-btn-mobile:hover {
-  background-color: #e2e8f0;
-  color: #3b82f6;
-}
-
-.sidebar.theme-dark .close-btn-mobile:hover {
-  background-color: #1e293b;
-  color: #3b82f6;
-}
+.close-btn-mobile:hover { transform: scale(1.12) rotate(90deg); }
+.close-btn-mobile:active { transform: scale(0.95) rotate(90deg); transition-duration: 70ms; }
+.sidebar.theme-light .close-btn-mobile:hover { background-color: #e2e8f0; color: #3b82f6; }
+.sidebar.theme-dark .close-btn-mobile:hover { background-color: #1e293b; color: #3b82f6; }
 
 /* ─── THEME SWITCHER MÓVIL ───────────────────────────── */
 .theme-switcher-mobile {
@@ -706,39 +674,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition:
-    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    background-color 150ms ease,
-    color 150ms ease;
-  will-change: transform;
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), background-color 140ms ease, color 140ms ease;
 }
 
-.sidebar.theme-light .theme-btn-mobile {
-  color: #94a3b8;
-}
+.sidebar.theme-light .theme-btn-mobile { color: #94a3b8; }
+.sidebar.theme-dark .theme-btn-mobile { color: #64748b; }
 
-.sidebar.theme-dark .theme-btn-mobile {
-  color: #64748b;
-}
-
-.theme-btn-mobile.active {
-  transform: scale(1.18);
-}
-
-.theme-btn-mobile:active {
-  transform: scale(0.95);
-  transition-duration: 80ms;
-}
-
-.sidebar.theme-light .theme-btn-mobile.active {
-  color: #f59e0b;
-  background-color: #fef3c7;
-}
-
-.sidebar.theme-dark .theme-btn-mobile.active {
-  color: #60a5fa;
-  background-color: rgba(59, 130, 246, 0.2);
-}
+.theme-btn-mobile.active { transform: scale(1.15); }
+.theme-btn-mobile:active { transform: scale(0.93); transition-duration: 70ms; }
+.sidebar.theme-light .theme-btn-mobile.active { color: #f59e0b; background-color: #fef3c7; }
+.sidebar.theme-dark .theme-btn-mobile.active { color: #60a5fa; background-color: rgba(59, 130, 246, 0.2); }
 
 .theme-label-mobile {
   font-size: 13px;
@@ -747,44 +692,34 @@
   transition: color 150ms ease;
 }
 
-.sidebar.theme-light .theme-label-mobile {
-  color: #64748b;
-}
-
-.sidebar.theme-dark .theme-label-mobile {
-  color: #94a3b8;
-}
+.sidebar.theme-light .theme-label-mobile { color: #64748b; }
+.sidebar.theme-dark .theme-label-mobile { color: #94a3b8; }
 
 /* ════════════════════════════════════════════════════════════════
    MEDIA QUERIES
    ════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 768px) {
-  .sidebar:not(.sidebar-mobile) {
-    display: none;
-  }
+  .sidebar:not(.sidebar-mobile) { display: none; }
 }
 
 @media (min-width: 769px) {
-
   .sidebar-mobile,
-  .sidebar-overlay-backdrop {
-    display: none !important;
-  }
+  .sidebar-overlay-backdrop { display: none !important; }
 }
 
 /* ─── REDUCED MOTION ──────────────────────────────────── */
-
 @media (prefers-reduced-motion: reduce) {
-
   .sidebar,
   .sidebar-mobile,
   .nav-link,
   .nav-indicator,
   .hamburger-btn,
-  .theme-icon-only,
   .theme-btn,
-  .close-btn-mobile {
+  .close-btn-mobile,
+  .brand-text-desk,
+  .nav-label,
+  .theme-label {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
   }

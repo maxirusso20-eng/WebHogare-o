@@ -6,7 +6,7 @@
 // ──────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -111,11 +111,28 @@ function FlyToMarker({ target }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// SUBCOMPONENTE: Fuerza redibujo del mapa tras colapsar/expandir panel
+// ──────────────────────────────────────────────────────────────────
+function MapResizer({ panelExpandido }) {
+  const map = useMap();
+  useEffect(() => {
+    // Esperamos 250ms a que termine la transición CSS del panel (220ms)
+    const timeout = setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [map, panelExpandido]);
+  return null;
+}
+
+// ──────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ──────────────────────────────────────────────────────────────────
 export function PantallaMaps() {
   const [choferes, setChoferes] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [flyTarget, setFlyTarget] = useState(null);
   const [panelExpandido, setPanelExpandido] = useState(true);
   const [choferSeleccionado, setChoferSeleccionado] = useState(null);
@@ -137,12 +154,32 @@ export function PantallaMaps() {
         .order('orden', { ascending: true, nullsFirst: false });
       if (error) throw error;
       setChoferes(data || []);
+      setLastUpdated(new Date());
     } catch (err) {
       console.error('Error cargando choferes para el mapa:', err);
     } finally {
       setCargando(false);
     }
   }, []);
+
+  // Refresh manual — con feedback visual en el botón
+  const handleRefresh = useCallback(async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      const { data, error } = await supabase
+        .from('Choferes')
+        .select('id, nombre, condicion, zona, latitud, longitud, ultima_actualizacion')
+        .order('orden', { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      setChoferes(data || []);
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error('Error al actualizar choferes:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [isRefreshing]);
 
   // ── Realtime: actualización incremental ───────────────────────
   // Actualiza solo el chofer que cambió — no refetchea los 100.
@@ -156,6 +193,7 @@ export function PantallaMaps() {
     setChoferSeleccionado(prev =>
       prev?.id === updated.id ? { ...prev, ...updated } : prev
     );
+    setLastUpdated(new Date()); // timestamp en cada cambio realtime
   }, []);
 
   useEffect(() => {
@@ -280,7 +318,7 @@ export function PantallaMaps() {
 
   return (
     <div className="pantalla-maps" style={{
-      display: 'flex', height: 'calc(100vh - 60px)',
+      display: 'flex', height: '100%',
       background: 'var(--bg-page)', position: 'relative', overflow: 'hidden',
     }}>
       {/* ── PANEL LATERAL IZQUIERDO ── */}
@@ -290,8 +328,10 @@ export function PantallaMaps() {
         background: 'var(--bg-surface)',
         borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column',
-        transition: 'all 0.3s ease', zIndex: 10,
+        transition: 'width 220ms cubic-bezier(0.4,0,0.2,1), min-width 220ms cubic-bezier(0.4,0,0.2,1)',
+        zIndex: 10,
         position: 'relative',
+        overflow: 'hidden',
       }}>
         {/* Header del panel */}
         <div style={{
@@ -320,7 +360,7 @@ export function PantallaMaps() {
               background: 'var(--bg-raised)', border: '1px solid var(--border)',
               borderRadius: '8px', padding: '6px', cursor: 'pointer',
               color: 'var(--text-2)', display: 'flex', alignItems: 'center',
-              transition: 'all 0.2s', flexShrink: 0,
+              transition: 'opacity 120ms ease, transform 120ms ease', flexShrink: 0,
             }}
             title={panelExpandido ? 'Colapsar panel' : 'Expandir panel'}
           >
@@ -459,20 +499,47 @@ export function PantallaMaps() {
         {panelExpandido && (
           <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
             <button
-              onClick={fetchChoferes}
+              onClick={handleRefresh}
+              disabled={isRefreshing}
               style={{
                 width: '100%', padding: '8px',
-                background: 'var(--bg-raised)', border: '1px solid var(--border)',
-                borderRadius: '8px', color: 'var(--text-2)',
-                fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                background: isRefreshing ? '#3b82f6' : 'var(--bg-raised)',
+                border: `1px solid ${isRefreshing ? '#3b82f6' : 'var(--border)'}`,
+                borderRadius: '8px',
+                color: isRefreshing ? '#fff' : 'var(--text-2)',
+                fontSize: '12px', fontWeight: '600',
+                cursor: isRefreshing ? 'not-allowed' : 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                transition: 'all 0.15s',
+                transition: 'all 0.2s',
+                opacity: isRefreshing ? 0.85 : 1,
               }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#3b82f6'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              onMouseEnter={e => { if (!isRefreshing) e.currentTarget.style.borderColor = '#3b82f6'; }}
+              onMouseLeave={e => { if (!isRefreshing) e.currentTarget.style.borderColor = 'var(--border)'; }}
             >
-              🔄 Actualizar
+              <span style={{
+                display: 'inline-block',
+                animation: isRefreshing ? 'spin 0.7s linear infinite' : 'none',
+                fontSize: '14px',
+              }}>🔄</span>
+              {isRefreshing ? 'Actualizando...' : 'Actualizar'}
             </button>
+
+            {/* Timestamp de última actualización */}
+            {lastUpdated && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: '5px', marginTop: '8px',
+                fontSize: '11px', color: 'var(--text-3)',
+              }}>
+                <span style={{
+                  width: '6px', height: '6px', borderRadius: '50%',
+                  background: '#34D399', flexShrink: 0,
+                  boxShadow: '0 0 4px #34D399',
+                  animation: 'pulseGPS 2s ease-in-out infinite',
+                }} />
+                Actualizado {formatTiempo(lastUpdated.toISOString())}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -507,7 +574,7 @@ export function PantallaMaps() {
           center={[-34.6037, -58.3816]}
           zoom={10}
           style={{ width: '100%', height: '100%' }}
-          zoomControl={true}
+          zoomControl={false}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -523,7 +590,11 @@ export function PantallaMaps() {
             {marcadores}
           </MarkerClusterGroup>
 
+          {/* Zoom control en la esquina inferior derecha — lejos del sidebar */}
+          <ZoomControl position="bottomright" />
+
           {flyTarget && <FlyToMarker target={flyTarget} />}
+          <MapResizer panelExpandido={panelExpandido} />
         </MapContainer>
 
         {/* Badge: sin GPS si hay choferes sin coordenadas */}

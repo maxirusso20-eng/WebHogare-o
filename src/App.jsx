@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, createContext, useRef, useContext } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from './supabase';
 import './index.css';
-import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, BookOpen, Archive, Download, Clock, ClipboardList, ChevronDown } from 'lucide-react';
-import { DashboardSabados } from './DashboardSabados';
+import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, BookOpen, Archive, Download, Clock, ClipboardList, ChevronDown, MessageSquare, Bell } from 'lucide-react';
+import { DashboardSabados } from './components/DashboardSabados';
 import {
   DndContext,
   closestCenter,
@@ -29,6 +30,10 @@ import { ModalAgregarCliente } from './components/ModalAgregarCliente';
 import { ModalConfirmacion } from './components/ModalConfirmacion';
 import { TarjetaChofer } from './components/TarjetaChofer';
 import { PantallaMaps } from './components/PantallaMaps';
+import { PantallaLogin } from './components/PantallaLogin';
+import { PantallaRoles } from './components/PantallaRoles';
+import { PantallaChat } from './components/PantallaChat';
+import { PantallaDashboard } from './components/PantallaDashboard';
 
 // ────────────────────────────────────────────────────────────────────────
 // CONTEXTO GLOBAL
@@ -37,10 +42,13 @@ export const AppContext = createContext();
 
 function App() {
   // ─── ESTADO ───────────────────────────────────────────────
+  const [session, setSession] = useState(undefined);
+  const [subadmins, setSubadmins] = useState([]);
   const [choferes, setChoferes] = useState([]);
   const [colectas, setColectas] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showSplash, setShowSplash] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [toasts, setToasts] = useState([]);
@@ -55,11 +63,33 @@ function App() {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
+  // ─── AUTENTICACIÓN ──────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   // ─── SINCRONIZAR CON SUPABASE ─────────────────────────
   useEffect(() => {
     const cargarDatos = async () => {
       try {
         setLoading(true);
+
+        try {
+          const { data: subData, error: subError } = await supabase.from('Subadmins').select('*');
+          if (!subError && subData) setSubadmins(subData);
+        } catch (e) {
+          console.warn('Tabla Subadmins no encontrada o sin acceso');
+        }
 
         // Cargar Choferes
         const { data: choferesData } = await supabase
@@ -94,7 +124,12 @@ function App() {
       }
     };
 
-    cargarDatos();
+    // Forzar el splash un mínimo de 1.5s para que se vea la animación fluida
+    const minSplashPromise = new Promise(resolve => setTimeout(resolve, 1500));
+
+    Promise.all([cargarDatos(), minSplashPromise]).then(() => {
+      setShowSplash(false);
+    });
 
     // Suscribirse a cambios en tiempo real
     const subscription = supabase
@@ -282,7 +317,15 @@ function App() {
     }
   };
 
+  const isSuperAdmin = session?.user?.email === 'maxirusso20@gmail.com';
+  const isAdmin = isSuperAdmin || subadmins.some(s => s.email === session?.user?.email);
+
   const contextValue = {
+    session,
+    isAdmin,
+    isSuperAdmin,
+    subadmins,
+    setSubadmins,
     choferes,
     setChoferes,
     colectas,
@@ -290,6 +333,7 @@ function App() {
     clientes,
     setClientes,
     loading,
+    setShowSplash,
     currentPage,
     setCurrentPage,
     theme,
@@ -306,53 +350,144 @@ function App() {
   };
 
   // ─── RENDER ───────────────────────────────────────────
-  if (loading) {
-    return (
-      <div className="splash-screen">
-        <div className="spinner"></div>
-        <p>Cargando...</p>
-      </div>
-    );
-  }
-
   return (
     <AppContext.Provider value={contextValue}>
-      <div className={`app theme-${theme}`}>
-        {/* HEADER FIJO - NO SE MUEVE */}
-        <Header
-          onBrandClick={() => setCurrentPage('dashboard')}
-          onMobileMenuClick={() => setIsSidebarMobileOpen(true)}
+      {showSplash && (
+        <div className="splash-screen">
+          <div className="splash-background"></div>
+          <div className="splash-content">
+            <div className="splash-icon-wrapper">
+              <Truck size={64} strokeWidth={1.5} color="#ffffff" className="splash-truck" />
+            </div>
+            <h1 className="splash-title">Logistica Hogareño</h1>
+            <p className="splash-subtitle">SISTEMA DE LOGÍSTICA</p>
+
+            <div className="splash-progress-container">
+              <div className="splash-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {session === undefined ? null : !session ? (
+        <div style={{ display: showSplash ? 'none' : 'block' }}>
+          <PantallaLogin />
+        </div>
+      ) : (
+        <AppShell
+          theme={theme}
+          showSplash={showSplash}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          isSidebarMobileOpen={isSidebarMobileOpen}
+          setIsSidebarMobileOpen={setIsSidebarMobileOpen}
+          isAdmin={isAdmin}
+          isSuperAdmin={isSuperAdmin}
+          session={session}
+          toggleTheme={toggleTheme}
         />
+      )}
 
-        {/* CONTENEDOR SIDEBAR + MAIN - Debajo del header */}
-        <div className="app-body">
-          <Sidebar
-            currentPage={currentPage}
-            setCurrentPage={setCurrentPage}
-            theme={theme}
-            toggleTheme={toggleTheme}
-            isMobileOpen={isSidebarMobileOpen}
-            setIsMobileOpen={setIsSidebarMobileOpen}
-          />
+      {/* Toast Container */}
+      <div className="toast-container">
+        {toasts.map(toast => (
+          <Toast key={toast.id} mensaje={toast.mensaje} tipo={toast.tipo} />
+        ))}
+      </div>
+    </AppContext.Provider>
+  );
+}
 
-          <main className="main-content">
+function AppShell({ theme, showSplash, currentPage, setCurrentPage, isSidebarMobileOpen, setIsSidebarMobileOpen, isAdmin, isSuperAdmin, session, toggleTheme }) {
+  const [unreadCount, setUnreadCount] = useState(0);
+  const soundRef = useRef(null);
+
+  // Sonido de notificación (Web Audio API — sin archivos externos)
+  const playNotifSound = useRef(() => {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.15, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.3);
+    } catch (e) { }
+  });
+
+  // Cargar conteo inicial de no leídos
+  useEffect(() => {
+    if (!session?.user) return;
+    const cargarUnread = async () => {
+      let q = supabase.from('mensajes').select('id', { count: 'exact', head: true });
+      if (isAdmin) {
+        q = q.eq('admin_id', session.user.email).eq('visto_admin', false).neq('remitente', 'Administración');
+      } else {
+        q = q.eq('user_id', session.user.id).eq('remitente', 'Administración');
+        // solo si tiene columna visto_chofer
+        try { q = q.eq('visto_chofer', false); } catch (_) { }
+      }
+      const { count } = await q;
+      setUnreadCount(count || 0);
+    };
+    cargarUnread();
+
+    // Realtime: nuevo mensaje → sumar al badge y sonar
+    const ch = supabase.channel(`unread_badge_${session.user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, ({ new: m }) => {
+        const esMio = isAdmin ? m.remitente === 'Administración' : m.remitente !== 'Administración';
+        const esDeAdminCorrect = isAdmin ? m.admin_id === session.user.email : m.user_id === session.user.id;
+        if (!esMio && esDeAdminCorrect) {
+          setUnreadCount(prev => prev + 1);
+          // Solo sonar si no estamos en la página de chat
+          if (currentPage !== 'chat') playNotifSound.current();
+        }
+      }).subscribe();
+
+    return () => supabase.removeChannel(ch);
+  }, [session, isAdmin]);
+
+  // Resetear badge al entrar al chat
+  useEffect(() => {
+    if (currentPage === 'chat') setUnreadCount(0);
+  }, [currentPage]);
+
+  return (
+    <div className={`app theme-${theme}`} style={{ display: showSplash ? 'none' : 'flex' }}>
+      <Header
+        onBrandClick={() => setCurrentPage('dashboard')}
+        onMobileMenuClick={() => setIsSidebarMobileOpen(true)}
+      />
+      <div className="app-body">
+        <Sidebar
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          theme={theme}
+          toggleTheme={toggleTheme}
+          isMobileOpen={isSidebarMobileOpen}
+          setIsMobileOpen={setIsSidebarMobileOpen}
+          isAdmin={isAdmin}
+          isSuperAdmin={isSuperAdmin}
+          unreadCount={unreadCount}
+        />
+        <main className="main-content" style={{ position: 'relative' }}>
+          <div key={currentPage} className="animate-fade-slide" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '100%' }}>
             {currentPage === 'dashboard' && <PantallaDashboard />}
             {currentPage === 'recorridos' && <PantallaRecorridos />}
             {currentPage === 'choferes' && <PantallaChoferes />}
             {currentPage === 'clientes' && <PantallaClientes />}
             {currentPage === 'historial' && <PantallaHistorial />}
             {currentPage === 'maps' && <PantallaMaps />}
-          </main>
-        </div>
-
-        {/* Toast Container */}
-        <div className="toast-container">
-          {toasts.map(toast => (
-            <Toast key={toast.id} mensaje={toast.mensaje} tipo={toast.tipo} />
-          ))}
-        </div>
+            {currentPage === 'chat' && <PantallaChat />}
+            {currentPage === 'roles' && <PantallaRoles />}
+          </div>
+        </main>
       </div>
-    </AppContext.Provider>
+    </div>
   );
 }
 
@@ -360,276 +495,9 @@ function App() {
 // COMPONENTES
 // ════════════════════════════════════════════════════════════════
 
-// ════════════════════════════════════════════════════════════════
-// PANTALLA: Dashboard
-// ════════════════════════════════════════════════════════════════
-function PantallaDashboard() {
-  const { colectas, choferes, clientes, theme, setCurrentPage } = useContext(AppContext);
-  const [colectasSabados, setColectasSabados] = useState([]);
-  const [tabDashboard, setTabDashboard] = useState('LUNES A VIERNES');
-
-  useEffect(() => {
-    const fetchSabados = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('recorridos_sabados')
-          .select('*')
-          .order('orden', { ascending: true });
-        if (error) throw error;
-        setColectasSabados(data || []);
-      } catch (err) {
-        console.error('Error fetching sabados:', err);
-      }
-    };
-
-    // Carga inicial
-    fetchSabados();
-
-    // Realtime: re-fetch cuando cambie recorridos_sabados
-    const canalSabados = supabase
-      .channel('dashboard:recorridos_sabados')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'recorridos_sabados' },
-        (payload) => {
-          console.log('🔴 Realtime [dashboard:sabados]:', payload.eventType, payload);
-          fetchSabados();
-        }
-      )
-      .subscribe();
-
-    // Cleanup: cerrar canal al desmontar el Dashboard
-    return () => {
-      supabase.removeChannel(canalSabados);
-    };
-  }, []);
-
-  const clientesSemana = clientes.filter(c => c.tipo_dia !== 'SÁBADOS');
-  const clientesSabados = clientes.filter(c => c.tipo_dia === 'SÁBADOS');
-
-  // Lógica Dinámica
-  const datosActivos = tabDashboard === 'SÁBADOS' ? colectasSabados : colectas;
-  const totalPaquetes = datosActivos.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
-  const totalEntregados = datosActivos.reduce((s, c) => s + (c.entregados || 0) + (c.entregadosFuera || 0), 0);
-  const pctGlobal = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : 0;
-  const rutasSinChoferActivas = datosActivos.filter(c => !c.idChofer || c.idChofer === 0);
-
-  const ZONAS = ['ZONA OESTE', 'ZONA SUR', 'ZONA NORTE', 'CABA'];
-  const coloresZona = {
-    'ZONA OESTE': '#3b82f6',
-    'ZONA SUR': '#8b5cf6',
-    'ZONA NORTE': '#ec4899',
-    'CABA': '#06b6d4',
-  };
-
-  const cardBg = theme === 'light' ? '#ffffff' : '#1e293b';
-  const border = theme === 'light' ? '#e2e8f0' : '#334155';
-  const textPrimary = theme === 'light' ? '#1e293b' : '#f8fafc';
-  const textSecondary = theme === 'light' ? '#64748b' : '#94a3b8';
-  const pageBg = theme === 'light' ? '#f8fafc' : '#020617';
-
-  const getPctColor = (pct) => {
-    const n = parseFloat(pct);
-    if (n >= 100) return '#10b981';
-    if (n >= 80) return '#06b6d4';
-    if (n >= 50) return '#f59e0b';
-    return '#ef4444';
-  };
-
-  return (
-    <div style={{ padding: '24px', backgroundColor: pageBg, minHeight: '100vh' }}>
-      {/* TÍTULO */}
-      <div style={{ marginBottom: '28px' }}>
-        <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700', color: textPrimary }}>
-          📊 Dashboard
-        </h1>
-        <p style={{ margin: '4px 0 0', fontSize: '14px', color: textSecondary }}>
-          Resumen del día — {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-      </div>
-
-      {/* TABS DASHBOARD */}
-      <div className="flex gap-2 mb-6">
-        {[
-          { label: 'LUNES A VIERNES', value: 'LUNES A VIERNES' },
-          { label: 'SÁBADOS', value: 'SÁBADOS' }
-        ].map(tab => (
-          <button
-            key={tab.value}
-            onClick={() => setTabDashboard(tab.value)}
-            className="px-4 py-2 rounded-t-lg font-semibold text-sm transition-all duration-100 border-b-2 focus:outline-none"
-            style={tabDashboard === tab.value
-              ? { background: 'var(--bg-raised)', borderColor: 'var(--brand-blue)', color: 'var(--brand-blue)' }
-              : { background: 'var(--bg-hover)', borderColor: 'transparent', color: 'var(--text-3)' }
-            }
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* BLOQUE DINÁMICO */}
-      <div style={{ borderBottom: `2px solid ${border}`, paddingBottom: '8px', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', letterSpacing: '1px' }}>
-          📅 {tabDashboard}
-        </h2>
-      </div>
-
-      {/* CARDS GLOBALES */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-        {[
-          ...(tabDashboard === 'SÁBADOS' ? [
-            { label: 'Rutas activas', value: datosActivos.length, icon: '🗓️', color: '#06b6d4' }
-          ] : [
-            { label: 'Choferes activos', value: choferes.length, icon: '🚚', color: '#8b5cf6' }
-          ]),
-          { label: 'Total paquetes', value: totalPaquetes, icon: '📦', color: '#3b82f6' },
-          { label: 'Entregados', value: totalEntregados, icon: '✅', color: '#10b981' },
-          { label: '% Global', value: pctGlobal + '%', icon: '📈', color: getPctColor(pctGlobal) },
-          { label: 'Clientes activos', value: tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length, icon: tabDashboard === 'SÁBADOS' ? '🗓️' : '📅', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b' },
-          { label: 'Rutas sin chofer', value: rutasSinChoferActivas.length, icon: '⚠️', color: rutasSinChoferActivas.length > 0 ? '#ef4444' : '#10b981' }
-        ].map(card => (
-          <div key={card.label} style={{
-            backgroundColor: cardBg,
-            borderRadius: '12px',
-            border: `1px solid ${border}`,
-            padding: '20px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px',
-            boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.07)' : '0 4px 12px rgba(0,0,0,0.25)',
-          }}>
-            <div style={{ fontSize: '24px' }}>{card.icon}</div>
-            <div style={{ fontSize: '28px', fontWeight: '800', color: card.color, lineHeight: 1 }}>
-              {card.value}
-            </div>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              {card.label}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* RESUMEN POR ZONA DINÁMICO */}
-      <div style={{ marginBottom: '28px' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '700', color: textPrimary }}>
-          Resumen por zona
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
-          {ZONAS.map(zona => {
-            const items = datosActivos.filter(c => c.zona === zona);
-            const pqtes = items.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
-            const entregados = items.reduce((s, c) => s + (c.entregados || 0) + (c.entregadosFuera || 0), 0);
-            const pct = pqtes > 0 ? ((entregados / pqtes) * 100).toFixed(1) : 0;
-            const color = coloresZona[zona];
-            const sinChofer = items.filter(c => !c.idChofer || c.idChofer === 0).length;
-            return (
-              <div
-                key={zona}
-                onClick={() => setCurrentPage('recorridos')}
-                style={{
-                  backgroundColor: cardBg,
-                  borderRadius: '10px',
-                  border: `1px solid ${border}`,
-                  borderLeft: `4px solid ${color}`,
-                  padding: '16px',
-                  cursor: 'pointer',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${color}25`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '13px', fontWeight: '700', color, textTransform: 'uppercase' }}>{zona}</span>
-                  <span style={{ fontSize: '20px', fontWeight: '800', color: getPctColor(pct) }}>{pct}%</span>
-                </div>
-                <div style={{ height: '6px', borderRadius: '3px', backgroundColor: theme === 'light' ? '#e2e8f0' : '#334155', marginBottom: '10px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, backgroundColor: getPctColor(pct), borderRadius: '3px', transition: 'width 0.5s ease' }} />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: textSecondary }}>
-                  <span>{entregados}/{pqtes} pqtes</span>
-                  <span>{items.length} rutas</span>
-                </div>
-                {sinChofer > 0 && (
-                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>
-                    ⚠️ {sinChofer} ruta{sinChofer > 1 ? 's' : ''} sin chofer
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-
-      {/* CLIENTES ACTIVOS ESE DÍA */}
-      <div style={{ marginBottom: '28px' }}>
-        <h2 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '700', color: textPrimary }}>
-          Clientes registrados ({tabDashboard})
-        </h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
-          <div
-            onClick={() => setCurrentPage('clientes')}
-            style={{
-              backgroundColor: cardBg,
-              borderRadius: '10px',
-              border: `1px solid ${border}`,
-              borderLeft: `4px solid ${tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b'}`,
-              padding: '16px',
-              cursor: 'pointer',
-              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${tabDashboard === 'SÁBADOS' ? 'rgba(6,182,212,0.2)' : 'rgba(245,158,11,0.2)'}`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', textTransform: 'uppercase' }}>
-                {tabDashboard === 'SÁBADOS' ? '🗓️ Sábados' : '📅 Lunes a Viernes'}
-              </span>
-              <span style={{ fontSize: '26px', fontWeight: '800', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b' }}>
-                {tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length}
-              </span>
-            </div>
-            <div style={{ height: '6px', borderRadius: '3px', backgroundColor: theme === 'light' ? '#e2e8f0' : '#334155', marginBottom: '10px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: clientes.length > 0 ? `${((tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length) / clientes.length) * 100}%` : '0%', backgroundColor: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', borderRadius: '3px', transition: 'width 0.5s ease' }} />
-            </div>
-            <div style={{ fontSize: '12px', color: textSecondary }}>
-              {clientes.length > 0 ? (((tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length) / clientes.length) * 100).toFixed(0) : 0}% del padrón total de clientes
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ALERTAS */}
-      {rutasSinChoferActivas.length > 0 && (
-        <div style={{
-          backgroundColor: theme === 'light' ? '#fef2f2' : '#2d1515',
-          border: `1px solid #ef444440`,
-          borderLeft: '4px solid #ef4444',
-          borderRadius: '10px',
-          padding: '16px 20px',
-          marginBottom: '20px',
-        }}>
-          <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#ef4444' }}>
-            ⚠️ {rutasSinChoferActivas.length} ruta{rutasSinChoferActivas.length > 1 ? 's' : ''} sin chofer asignado ({tabDashboard})
-          </p>
-          <p style={{ margin: '4px 0 8px', fontSize: '13px', color: textSecondary }}>
-            {rutasSinChoferActivas.map(r => r.localidad).join(', ')}
-          </p>
-          <button
-            onClick={() => setCurrentPage('recorridos')}
-            style={{ fontSize: '12px', fontWeight: '600', color: '#ef4444', background: 'none', border: '1px solid #ef444460', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer' }}
-          >
-            Ir a Recorridos →
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function PantallaRecorridos() {
-  const { mostrarToast, theme, choferes } = useContext(AppContext);
+  const { mostrarToast, theme, choferes, setShowSplash } = useContext(AppContext);
   const [recorridoAEliminar, setRecorridoAEliminar] = useState(null);
   const [confirmDeleteRecorrido, setConfirmDeleteRecorrido] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -863,9 +731,9 @@ function PantallaRecorridos() {
   }
 
   return (
-    <div className="w-full" style={{ padding: '20px', backgroundColor: colors.backgroundColor, minHeight: '100vh' }}>
+    <div className="w-full" style={{ padding: '24px 28px', backgroundColor: colors.backgroundColor, minHeight: '100vh' }}>
       {/* HEADER */}
-      <div style={{ marginBottom: '30px' }}>
+      <div style={{ marginBottom: '24px', paddingBottom: '20px', borderBottom: `1px solid ${colors.border}` }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', marginBottom: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <Grid3x3 size={28} color={theme === 'light' ? '#3b82f6' : '#64b5f6'} strokeWidth={2} />
@@ -931,364 +799,388 @@ function PantallaRecorridos() {
       </div>
 
       {/* TABS */}
-      <div className="flex gap-2 mb-6">
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: `2px solid ${colors.border}` }}>
         {[
           { label: 'LUNES A VIERNES', value: 'LUNES A VIERNES' },
           { label: 'SÁBADOS', value: 'SÁBADOS' }
         ].map(tab => (
           <button
             key={tab.value}
-            onClick={() => setTabActiva(tab.value)}
-            className="px-4 py-2 rounded-t-lg font-semibold text-sm transition-all duration-100 border-b-2 focus:outline-none"
-            style={tabActiva === tab.value
-              ? { background: 'var(--bg-raised)', borderColor: 'var(--brand-blue)', color: 'var(--brand-blue)' }
-              : { background: 'var(--bg-hover)', borderColor: 'transparent', color: 'var(--text-3)' }
-            }
+            onClick={() => {
+              if (tabActiva !== tab.value) {
+                setShowSplash(true);
+                setTabActiva(tab.value);
+                setTimeout(() => setShowSplash(false), 1200);
+              }
+            }}
+            style={{
+              padding: '8px 20px',
+              borderRadius: '8px 8px 0 0',
+              fontWeight: '600',
+              fontSize: '13px',
+              border: 'none',
+              outline: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              marginBottom: '-2px',
+              borderBottom: tabActiva === tab.value ? `2px solid var(--brand-blue)` : '2px solid transparent',
+              background: tabActiva === tab.value ? 'var(--bg-raised)' : 'transparent',
+              color: tabActiva === tab.value ? 'var(--brand-blue)' : 'var(--text-3)',
+            }}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
-      {/* ── STATS CARDS ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-        {[
-          { label: `Rutas ${labelTabActiva}`, value: colectasLocales.length, icon: '🗺️', color: colorStatsCards },
-          { label: 'Total paquetes', value: totalPaquetes, icon: '📦', color: '#3b82f6' },
-          { label: 'Entregados', value: totalEntregados, icon: '✅', color: '#10b981' },
-          { label: '% Global', value: pctGlobal + '%', icon: '📈', color: getPercentageColor(pctGlobal) },
-        ].map(({ label, value, icon, color }) => (
-          <div key={label} style={{ backgroundColor: colors.cardBg, borderRadius: '10px', border: `1px solid ${colors.border}`, borderLeft: `4px solid ${color}`, padding: '14px 16px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
-              {icon} {label}
+      <div key={tabActiva} className="animate-fade-slide">
+        {/* ── STATS CARDS ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '28px' }}>
+          {[
+            { label: `Rutas ${labelTabActiva}`, value: colectasLocales.length, icon: '🗺️', color: colorStatsCards },
+            { label: 'Total paquetes', value: totalPaquetes, icon: '📦', color: '#3b82f6' },
+            { label: 'Entregados', value: totalEntregados, icon: '✅', color: '#10b981' },
+            { label: '% Global', value: pctGlobal + '%', icon: '📈', color: getPercentageColor(pctGlobal) },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} style={{
+              backgroundColor: colors.cardBg,
+              borderRadius: '12px',
+              border: `1px solid ${colors.border}`,
+              borderLeft: `4px solid ${color}`,
+              padding: '18px 20px',
+              boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.06)' : '0 4px 12px rgba(0,0,0,0.2)',
+            }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: '0.6px', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <span>{icon}</span> {label}
+              </div>
+              <div style={{ fontSize: '26px', fontWeight: '800', color, lineHeight: 1 }}>
+                {value}
+              </div>
             </div>
-            <div style={{ fontSize: '24px', fontWeight: '800', color }}>
-              {value}
-            </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      <>
-        {/* ZONAS */}
-        <div style={{ display: 'grid', gap: '24px' }}>
-          {ZONAS.map(zona => {
-            const datosZona = colectasLocales.filter(c => c.zona === zona);
-            const zoneColor = getZoneColor(zona);
+        <>
+          {/* ZONAS */}
+          <div style={{ display: 'grid', gap: '24px' }}>
+            {ZONAS.map(zona => {
+              const datosZona = colectasLocales.filter(c => c.zona === zona);
+              const zoneColor = getZoneColor(zona);
 
-            return (
-              <div
-                key={zona}
-                style={{
-                  backgroundColor: colors.cardBg,
-                  borderRadius: '12px',
-                  boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.08)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
-                  overflow: 'visible',
-                  border: `1px solid ${colors.border}`,
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {/* HEADER DE ZONA */}
+              return (
                 <div
+                  key={zona}
                   style={{
-                    background: theme === 'light'
-                      ? `linear-gradient(135deg, ${zoneColor}15 0%, ${zoneColor}08 100%)`
-                      : `linear-gradient(135deg, ${zoneColor}40 0%, ${zoneColor}20 100%)`,
-                    borderBottom: `2px solid ${zoneColor}`,
-                    padding: '16px 20px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center'
+                    backgroundColor: colors.cardBg,
+                    borderRadius: '12px',
+                    boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.08)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
+                    overflow: 'visible',
+                    border: `1px solid ${colors.border}`,
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <MapPin size={20} color={zoneColor} strokeWidth={2} />
-                    <h3 style={{ margin: 0, color: colors.textPrimary, fontSize: '16px', fontWeight: '600' }}>
-                      {zona}
-                    </h3>
-                    <span style={{
-                      backgroundColor: `${zoneColor}${theme === 'light' ? '15' : '30'}`,
-                      color: colors.textSecondary,
-                      padding: '2px 8px',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      border: `1px solid ${theme === 'light' ? `${zoneColor}30` : `${zoneColor}60`}`
-                    }}>
-                      {datosZona.length} rutas
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => abrirModal(zona)}
+                  {/* HEADER DE ZONA */}
+                  <div
                     style={{
+                      background: theme === 'light'
+                        ? `linear-gradient(135deg, ${zoneColor}15 0%, ${zoneColor}08 100%)`
+                        : `linear-gradient(135deg, ${zoneColor}40 0%, ${zoneColor}20 100%)`,
+                      borderBottom: `2px solid ${zoneColor}`,
+                      padding: '16px 20px',
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      backgroundColor: `${zoneColor}20`,
-                      color: colors.textPrimary,
-                      border: `1px solid ${colors.borderLight}`,
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = `${zoneColor}40`;
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = `${zoneColor}20`;
-                      e.currentTarget.style.transform = 'translateY(0)';
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}
                   >
-                    <Plus size={16} strokeWidth={2.5} />
-                    Añadir
-                  </button>
-                </div>
-
-                {/* TABLA */}
-                <div style={{ overflow: 'hidden' }}>
-                  {datosZona.length > 0 ? (
-                    <table style={{
-                      width: '100%',
-                      borderCollapse: 'collapse',
-                      fontSize: '14px',
-                      tableLayout: 'fixed',
-                    }}>
-                      <colgroup>
-                        <col style={{ width: '36px' }} />   {/* drag handle */}
-                        <col style={{ width: '72px' }} />   {/* ID RUTA */}
-                        <col />                             {/* LOCALIDAD — flexible */}
-                        <col style={{ width: '82px' }} />   {/* ID CHOFER */}
-                        <col style={{ width: '150px' }} />  {/* NOMBRE CHOFER */}
-                        <col style={{ width: '90px' }} />   {/* PQTE DÍA */}
-                        <col style={{ width: '90px' }} />   {/* POR FUERA */}
-                        <col style={{ width: '90px' }} />   {/* ENTREGADOS */}
-                        <col style={{ width: '90px' }} />   {/* ENT. FUERA */}
-                        <col style={{ width: '90px' }} />   {/* % DÍA */}
-                        <col style={{ width: '40px' }} />   {/* ACCIÓN */}
-                      </colgroup>
-                      <thead>
-                        <tr style={{
-                          backgroundColor: colors.headerBg,
-                          borderBottom: `1px solid ${colors.border}`
-                        }}>
-                          <th style={{ padding: '10px 0', width: '36px' }}></th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            ID RUTA
-                          </th>
-                          <th style={{
-                            padding: '10px 12px',
-                            textAlign: 'left',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                              <MapPin size={13} color={zoneColor} />
-                              Localidad
-                            </div>
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            ID CHF
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                              <Truck size={13} color={zoneColor} />
-                              Chofer
-                            </div>
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                              <Package size={13} color={zoneColor} />
-                              Pqte Día
-                            </div>
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                              <Plus size={13} color={zoneColor} />
-                              Por Fuera
-                            </div>
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                              <CheckCircle size={13} color={zoneColor} />
-                              Entregados
-                            </div>
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                              <CheckCircle size={13} color='#f59e0b' />
-                              Ent. Fuera
-                            </div>
-                          </th>
-                          <th style={{
-                            padding: '10px 8px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '700',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
-                              <TrendingUp size={13} color={zoneColor} />
-                              % Día
-                            </div>
-                          </th>
-                          <th style={{ padding: '10px 0', width: '40px' }}></th>
-                        </tr>
-                      </thead>
-                      <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={(e) => handleDragEnd(e, zona)}
-                      >
-                        <SortableContext
-                          items={datosZona.map(i => i.id)}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          <tbody>
-                            {datosZona.map((item, idx) => {
-                              const total = (item.pqteDia || 0) + (item.porFuera || 0);
-                              const entregadosTotales = (item.entregados || 0) + (item.entregadosFuera || 0);
-                              const porcentaje = total > 0
-                                ? parseFloat(((entregadosTotales / total) * 100).toFixed(1))
-                                : 0;
-                              const porcentajeStr = porcentaje + '%';
-
-                              return (
-                                <SortableFilaLocalidad
-                                  key={item.id}
-                                  item={item}
-                                  idx={idx}
-                                  colors={colors}
-                                  zoneColor={zoneColor}
-                                  theme={theme}
-                                  choferes={choferes}
-                                  guardarCambioBD={guardarCambioBD}
-                                  guardarLocalidad={guardarLocalidad}
-                                  obtenerNombreChofer={obtenerNombreChofer}
-                                  getPercentageColor={getPercentageColor}
-                                  porcentajeStr={porcentajeStr}
-                                  entregadosFuera={item.entregadosFuera || 0}
-                                  onEliminar={() => { setRecorridoAEliminar(item); setConfirmDeleteRecorrido(true); }}
-                                />
-                              );
-                            })}
-                          </tbody>
-                        </SortableContext>
-                      </DndContext>
-                    </table>
-                  ) : (
-                    /* EMPTY STATE */
-                    <div style={{
-                      padding: '40px 20px',
-                      textAlign: 'center',
-                      backgroundColor: colors.rowAlt
-                    }}>
-                      <AlertCircle size={40} color={colors.textSecondary} style={{ margin: '0 auto 12px' }} strokeWidth={1.5} />
-                      <p style={{ margin: '0 0 4px 0', color: colors.textSecondary, fontSize: '15px', fontWeight: '500' }}>
-                        No hay rutas cargadas para esta zona
-                      </p>
-                      <p style={{ margin: '0 0 16px 0', color: colors.textSecondary, fontSize: '13px', opacity: '0.7' }}>
-                        Crea tu primera ruta haciendo clic en el botón "Añadir" arriba
-                      </p>
-                      <button
-                        onClick={() => abrirModal(zona)}
-                        style={{
-                          backgroundColor: zoneColor,
-                          color: 'white',
-                          border: 'none',
-                          padding: '8px 16px',
-                          borderRadius: '6px',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s ease',
-                          opacity: '0.8'
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.opacity = '1';
-                          e.currentTarget.style.transform = 'translateY(-2px)';
-                          e.currentTarget.style.boxShadow = `0 4px 12px ${zoneColor}40`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.opacity = '0.8';
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = 'none';
-                        }}
-                      >
-                        + Nueva ruta
-                      </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <MapPin size={20} color={zoneColor} strokeWidth={2} />
+                      <h3 style={{ margin: 0, color: colors.textPrimary, fontSize: '16px', fontWeight: '600' }}>
+                        {zona}
+                      </h3>
+                      <span style={{
+                        backgroundColor: `${zoneColor}${theme === 'light' ? '15' : '30'}`,
+                        color: colors.textSecondary,
+                        padding: '2px 8px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        border: `1px solid ${theme === 'light' ? `${zoneColor}30` : `${zoneColor}60`}`
+                      }}>
+                        {datosZona.length} rutas
+                      </span>
                     </div>
-                  )}
+                    <button
+                      onClick={() => abrirModal(zona)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backgroundColor: `${zoneColor}20`,
+                        color: colors.textPrimary,
+                        border: `1px solid ${colors.borderLight}`,
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = `${zoneColor}40`;
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = `${zoneColor}20`;
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <Plus size={16} strokeWidth={2.5} />
+                      Añadir
+                    </button>
+                  </div>
+
+                  {/* TABLA */}
+                  <div style={{ overflow: 'visible' }}>
+                    {datosZona.length > 0 ? (
+                      <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        fontSize: '14px',
+                        tableLayout: 'fixed',
+                      }}>
+                        <colgroup>
+                          <col style={{ width: '32px' }} />   {/* drag handle */}
+                          <col style={{ width: '68px' }} />   {/* ID RUTA */}
+                          <col />                             {/* LOCALIDAD — flexible */}
+                          <col style={{ width: '72px' }} />   {/* ID CHOFER */}
+                          <col style={{ width: '175px' }} />  {/* NOMBRE CHOFER */}
+                          <col style={{ width: '88px' }} />   {/* PQTE DÍA */}
+                          <col style={{ width: '88px' }} />   {/* POR FUERA */}
+                          <col style={{ width: '88px' }} />   {/* ENTREGADOS */}
+                          <col style={{ width: '88px' }} />   {/* ENT. FUERA */}
+                          <col style={{ width: '88px' }} />   {/* % DÍA */}
+                          <col style={{ width: '40px' }} />   {/* ACCIÓN */}
+                        </colgroup>
+                        <thead>
+                          <tr style={{
+                            backgroundColor: colors.headerBg,
+                            borderBottom: `1px solid ${colors.border}`
+                          }}>
+                            <th style={{ padding: '10px 0', width: '36px' }}></th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              ID RUTA
+                            </th>
+                            <th style={{
+                              padding: '10px 12px',
+                              textAlign: 'left',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <MapPin size={13} color={zoneColor} />
+                                Localidad
+                              </div>
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              ID CHF
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                                <Truck size={13} color={zoneColor} />
+                                Chofer
+                              </div>
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                                <Package size={13} color={zoneColor} />
+                                Pqte Día
+                              </div>
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                                <Plus size={13} color={zoneColor} />
+                                Por Fuera
+                              </div>
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                                <CheckCircle size={13} color={zoneColor} />
+                                Entregados
+                              </div>
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                                <CheckCircle size={13} color='#f59e0b' />
+                                Ent. Fuera
+                              </div>
+                            </th>
+                            <th style={{
+                              padding: '10px 8px',
+                              textAlign: 'center',
+                              color: colors.textSecondary,
+                              fontWeight: '700',
+                              fontSize: '11px',
+                              letterSpacing: '0.5px',
+                              textTransform: 'uppercase',
+                            }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', justifyContent: 'center' }}>
+                                <TrendingUp size={13} color={zoneColor} />
+                                % Día
+                              </div>
+                            </th>
+                            <th style={{ padding: '10px 0', width: '40px' }}></th>
+                          </tr>
+                        </thead>
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={(e) => handleDragEnd(e, zona)}
+                        >
+                          <SortableContext
+                            items={datosZona.map(i => i.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <tbody>
+                              {datosZona.map((item, idx) => {
+                                const total = (item.pqteDia || 0) + (item.porFuera || 0);
+                                const entregadosTotales = (item.entregados || 0) + (item.entregadosFuera || 0);
+                                const porcentaje = total > 0
+                                  ? parseFloat(((entregadosTotales / total) * 100).toFixed(1))
+                                  : 0;
+                                const porcentajeStr = porcentaje + '%';
+
+                                return (
+                                  <SortableFilaLocalidad
+                                    key={item.id}
+                                    item={item}
+                                    idx={idx}
+                                    colors={colors}
+                                    zoneColor={zoneColor}
+                                    theme={theme}
+                                    choferes={choferes}
+                                    guardarCambioBD={guardarCambioBD}
+                                    guardarLocalidad={guardarLocalidad}
+                                    obtenerNombreChofer={obtenerNombreChofer}
+                                    getPercentageColor={getPercentageColor}
+                                    porcentajeStr={porcentajeStr}
+                                    entregadosFuera={item.entregadosFuera || 0}
+                                    onEliminar={() => { setRecorridoAEliminar(item); setConfirmDeleteRecorrido(true); }}
+                                  />
+                                );
+                              })}
+                            </tbody>
+                          </SortableContext>
+                        </DndContext>
+                      </table>
+                    ) : (
+                      /* EMPTY STATE */
+                      <div style={{
+                        padding: '40px 20px',
+                        textAlign: 'center',
+                        backgroundColor: colors.rowAlt
+                      }}>
+                        <AlertCircle size={40} color={colors.textSecondary} style={{ margin: '0 auto 12px' }} strokeWidth={1.5} />
+                        <p style={{ margin: '0 0 4px 0', color: colors.textSecondary, fontSize: '15px', fontWeight: '500' }}>
+                          No hay rutas cargadas para esta zona
+                        </p>
+                        <p style={{ margin: '0 0 16px 0', color: colors.textSecondary, fontSize: '13px', opacity: '0.7' }}>
+                          Crea tu primera ruta haciendo clic en el botón "Añadir" arriba
+                        </p>
+                        <button
+                          onClick={() => abrirModal(zona)}
+                          style={{
+                            backgroundColor: zoneColor,
+                            color: 'white',
+                            border: 'none',
+                            padding: '8px 16px',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            opacity: '0.8'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.opacity = '1';
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = `0 4px 12px ${zoneColor}40`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.opacity = '0.8';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          + Nueva ruta
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </>
+              );
+            })}
+          </div>
+        </>
+      </div>
 
       {/* MODAL PARA AGREGAR LOCALIDAD */}
       <ModalAgregar
@@ -1532,13 +1424,27 @@ function PantallaChoferes() {
 function ChoferComboboxRow({ value, choferes, onChange }) {
   const [inputVal, setInputVal] = useState(value || '');
   const [open, setOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
   const ref = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => { setInputVal(value || ''); }, [value]);
 
   const filtrados = choferes.filter(c =>
     c.nombre.toLowerCase().includes(inputVal.toLowerCase())
   );
+
+  // Calcular posición fixed cuando se abre el dropdown
+  const calcularPosicion = () => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: Math.max(rect.width, 190),
+      });
+    }
+  };
 
   useEffect(() => {
     const handler = (e) => {
@@ -1551,19 +1457,37 @@ function ChoferComboboxRow({ value, choferes, onChange }) {
     return () => document.removeEventListener('mousedown', handler);
   }, [value]);
 
+  // Recalcular posición al hacer scroll o resize
+  useEffect(() => {
+    if (!open) return;
+    const update = () => calcularPosicion();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
   const seleccionar = (nombre) => {
     onChange(nombre);
     setInputVal(nombre);
     setOpen(false);
   };
 
+  const abrirDropdown = () => {
+    calcularPosicion();
+    setOpen(true);
+  };
+
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <input
+        ref={inputRef}
         type="text"
         value={inputVal}
-        onChange={e => { setInputVal(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
+        onChange={e => { setInputVal(e.target.value); if (!open) abrirDropdown(); }}
+        onFocus={() => abrirDropdown()}
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
@@ -1574,24 +1498,30 @@ function ChoferComboboxRow({ value, choferes, onChange }) {
             setOpen(false);
             setInputVal(value || '');
           } else if (e.key === 'Backspace' && value && inputVal === value) {
-            // Si el input tiene el nombre completo guardado y presionan borrar, limpiar todo
             e.preventDefault();
             setInputVal('');
             onChange('');
-            setOpen(true);
+            abrirDropdown();
           }
         }}
         placeholder="Seleccionar chofer..."
         className="theme-input px-2.5 py-1.5 rounded text-sm outline-none"
-        style={{ width: '160px' }}
+        style={{ width: '162px' }}
         autoComplete="off"
       />
-      {open && filtrados.length > 0 && (
+      {open && filtrados.length > 0 && createPortal(
         <div style={{
-          position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 9999,
-          background: 'var(--bg-surface)', border: '1.5px solid var(--border-strong)',
-          borderRadius: '8px', boxShadow: 'var(--shadow-lg)',
-          minWidth: '180px', maxHeight: '200px', overflowY: 'auto',
+          position: 'fixed',
+          top: dropdownPos.top,
+          left: dropdownPos.left,
+          width: dropdownPos.width,
+          zIndex: 99999,
+          background: 'var(--bg-surface)',
+          border: '1.5px solid var(--border-strong)',
+          borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.1)',
+          maxHeight: '220px',
+          overflowY: 'auto',
           animation: 'fadeUp 0.12s ease-out forwards',
         }}>
           {filtrados.map(ch => (
@@ -1615,7 +1545,8 @@ function ChoferComboboxRow({ value, choferes, onChange }) {
               {ch.nombre}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -1743,7 +1674,7 @@ function ChoferDropdown({ choferes, value, onChange }) {
 
 function PantallaClientes() {
 
-  const { clientes, setClientes, mostrarToast, choferes, theme } = useContext(AppContext);
+  const { clientes, setClientes, mostrarToast, choferes, theme, setShowSplash } = useContext(AppContext);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, titulo: '', mensaje: '', textoConfirmar: '', isDanger: false, accion: null });
@@ -2036,7 +1967,13 @@ function PantallaClientes() {
         {tabs.map(tab => (
           <button
             key={tab.value}
-            onClick={() => setTabActiva(tab.value)}
+            onClick={() => {
+              if (tabActiva !== tab.value) {
+                setShowSplash(true);
+                setTabActiva(tab.value);
+                setTimeout(() => setShowSplash(false), 1200);
+              }
+            }}
             className="px-4 py-2 rounded-t-lg font-semibold text-sm transition-all duration-100 border-b-2 focus:outline-none"
             style={tabActiva === tab.value
               ? { background: 'var(--bg-raised)', borderColor: 'var(--brand-blue)', color: 'var(--brand-blue)' }
@@ -2048,52 +1985,49 @@ function PantallaClientes() {
         ))}
       </div>
 
-      {/* TABLA */}
-      <div className="rounded-xl border overflow-hidden shadow-sm" style={{ background: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+      {/* TABLA DINÁMICA CON ANIMACIÓN POR TABS */}
+      <div key={tabActiva} className="animate-fade-slide card w-full overflow-hidden" style={{ background: 'var(--bg-surface)', padding: 0 }}>
         <div className="overflow-x-auto">
           {clientesFiltrados.length > 0 ? (
             <table className="w-full border-collapse">
               <thead>
                 <tr style={{ background: 'var(--bg-raised)', borderBottom: '1px solid var(--border)' }}>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>CLIENTE</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>CHOFER</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>CELULAR</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>HORARIO</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>DIRECCIÓN</th>
-                  <th className="px-6 py-4 text-center text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>LLEGADA</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-3)' }}>ACCIONES</th>
+                  <th className="px-6 py-5 text-left text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>CLIENTE</th>
+                  <th className="px-6 py-5 text-left text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>CHOFER</th>
+                  <th className="px-6 py-5 text-left text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>CELULAR</th>
+                  <th className="px-6 py-5 text-left text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>HORARIO</th>
+                  <th className="px-6 py-5 text-left text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>DIRECCIÓN</th>
+                  <th className="px-6 py-5 text-center text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>LLEGADA</th>
+                  <th className="px-6 py-5 text-center text-xs font-bold uppercase tracking-widest text-[#a1a1aa] dark:text-[#a1a1aa]" style={{ letterSpacing: '1.2px' }}>ACCIONES</th>
                 </tr>
               </thead>
               <tbody>
                 {clientesFiltrados.map((cliente, idx) => (
                   <tr
                     key={cliente.id || idx}
-                    className="clientes-row"
-                    style={{ borderBottom: '1px solid var(--border)' }}
+                    className="table-row-animated group"
+                    style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.2s ease' }}
                   >
-                    <td className="px-6 py-4 text-sm font-medium" style={{ color: 'var(--text-1)' }}>{cliente.cliente || 'N/A'}</td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-6 py-4 text-[15px] font-bold" style={{ color: 'var(--text-1)' }}>{cliente.cliente || 'N/A'}</td>
+                    <td className="px-6 py-4 text-[14px] font-medium" style={{ color: 'var(--text-2)' }}>
                       <ChoferComboboxRow
                         value={cliente.chofer || ''}
                         choferes={choferes}
                         onChange={(nombre) => handleChangeChofer(cliente.id, nombre)}
                       />
                     </td>
-                    <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-2)' }}>{cliente.Choferes?.celular || 'Sin celular'}</td>
-                    <td className="px-6 py-4 text-sm" style={{ color: 'var(--text-2)' }}>{cliente.horario || 'N/A'}</td>
-                    <td className="px-6 py-4 text-sm max-w-xs truncate" style={{ color: 'var(--text-3)' }}>{cliente.direccion || 'N/A'}</td>
+                    <td className="px-6 py-4 text-[13px] font-medium" style={{ color: 'var(--text-3)' }}>{cliente.Choferes?.celular || 'Sin celular'}</td>
+                    <td className="px-6 py-4 text-[13px] font-bold" style={{ color: 'var(--brand-blue)' }}>{cliente.horario || 'N/A'}</td>
+                    <td className="px-6 py-4 text-[13px] max-w-[250px] truncate font-medium" style={{ color: 'var(--text-2)' }} title={cliente.direccion}>{cliente.direccion || 'N/A'}</td>
                     {/* LLEGADA */}
                     <td className="px-4 py-4 text-sm text-center">
                       {llegadas[cliente.id] ? (
                         <span
                           onClick={() => setLlegadas(prev => { const n = { ...prev }; delete n[cliente.id]; return n; })}
                           title="Click para quitar"
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold cursor-pointer select-none"
-                          style={{ background: '#10b98120', color: '#10b981', border: '1px solid #10b98140', transition: 'background 0.15s, color 0.15s, border-color 0.15s' }}
-                          onMouseEnter={e => { e.currentTarget.style.background = '#ef444418'; e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.borderColor = '#ef444440'; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = '#10b98120'; e.currentTarget.style.color = '#10b981'; e.currentTarget.style.borderColor = '#10b98140'; }}
+                          className="badge badge-success cursor-pointer shadow-sm hover:scale-105 hover:badge-danger transition-all mx-auto"
                         >
-                          <Clock size={11} />
+                          <Clock size={12} strokeWidth={2.5} />
                           {llegadas[cliente.id]}
                         </span>
                       ) : (
@@ -2104,29 +2038,29 @@ function PantallaClientes() {
                             setLlegadas(prev => ({ ...prev, [cliente.id]: hora }));
                           }}
                           title="Marcar hora de llegada"
-                          className="w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-150 hover:border-green-400 hover:bg-green-400/10 mx-auto"
-                          style={{ borderColor: 'var(--border)', background: 'transparent', cursor: 'pointer' }}
+                          className="w-7 h-7 rounded-full border-[1.5px] border-dashed border-[#a1a1aa] flex items-center justify-center transition-all duration-200 hover:border-[#10b981] hover:bg-[#10b98120] hover:text-[#10b981] mx-auto text-[var(--text-3)]"
                         >
+                          <Plus size={14} strokeWidth={2.5} />
                         </button>
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm text-center">
-                      <div className="flex justify-center items-center gap-3">
+                      <div className="flex justify-center items-center gap-4">
                         {cliente.chofer && cliente.Choferes?.celular && (
                           <button
                             onClick={() => enviarWhatsApp(cliente.chofer, cliente.Choferes.celular)}
-                            className="text-green-500 hover:text-green-400 transition-colors duration-150"
+                            className="text-[#10b981] opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-200"
                             title="Enviar resumen de colectas por WhatsApp"
                           >
-                            <MessageCircle size={18} />
+                            <MessageCircle size={18} strokeWidth={2.2} />
                           </button>
                         )}
                         <button
                           onClick={() => { setItemAEliminar(cliente); setIsConfirmDeleteOpen(true); }}
-                          className="text-red-500 hover:text-red-400 transition-colors duration-150"
+                          className="text-[#ef4444] opacity-70 hover:opacity-100 hover:scale-110 transition-all duration-200"
                           title="Eliminar cliente"
                         >
-                          <Trash2 size={18} />
+                          <Trash2 size={18} strokeWidth={2} />
                         </button>
                       </div>
                     </td>
@@ -2135,16 +2069,18 @@ function PantallaClientes() {
               </tbody>
             </table>
           ) : (
-            <div className="flex flex-col items-center justify-center text-center py-16 px-6" style={{ color: 'var(--text-3)' }}>
-              <Package size={48} className="mb-4 opacity-40" />
-              <p className="text-lg font-medium mb-1" style={{ color: 'var(--text-1)' }}>No hay clientes registrados aún</p>
-              <p className="text-sm mb-6">Agrega tu primer cliente para comenzar</p>
+            <div className="empty-state" style={{ padding: '60px 40px' }}>
+              <div className="empty-icon text-[var(--brand-blue)]">
+                <Package size={54} strokeWidth={1.5} />
+              </div>
+              <p className="text-xl font-bold mb-2" style={{ color: 'var(--text-1)' }}>Padrón de clientes vacío</p>
+              <p className="text-sm mb-6 max-w-sm text-center opacity-80" style={{ color: 'var(--text-3)' }}>Registrá a tus clientes con sus horarios habituales para integrarlos a las hojas de ruta y planillas de sábados.</p>
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-500 text-white rounded-lg font-semibold text-sm transition-all duration-150 hover:bg-blue-600 active:scale-95"
+                className="btn btn-primary shadow-blue"
               >
                 <Plus size={18} />
-                Agregar Cliente
+                Agregar tu primer cliente
               </button>
             </div>
           )}
@@ -2384,7 +2320,7 @@ function SortableFilaLocalidad({
 
       {/* NOMBRE CHOFER CON AUTOCOMPLETE */}
       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
-        <ChoferComboboxRow 
+        <ChoferComboboxRow
           value={obtenerNombreChofer(item.idChofer) === '—' ? '' : obtenerNombreChofer(item.idChofer)}
           choferes={choferes}
           onChange={(nombre) => {
@@ -2524,7 +2460,7 @@ function SortableFilaLocalidad({
 // PANTALLA: Historial Rec & Col
 // ════════════════════════════════════════════════════════════════
 function PantallaHistorial() {
-  const { theme, choferes } = useContext(AppContext);
+  const { theme, choferes, setShowSplash } = useContext(AppContext);
   const [tabActiva, setTabActiva] = useState('recorridos');
   const [histRecorridos, setHistRecorridos] = useState([]);
   const [histClientes, setHistClientes] = useState([]);
@@ -2732,7 +2668,13 @@ function PantallaHistorial() {
         ].map(tab => (
           <button
             key={tab.value}
-            onClick={() => setTabActiva(tab.value)}
+            onClick={() => {
+              if (tabActiva !== tab.value) {
+                setShowSplash(true);
+                setTabActiva(tab.value);
+                setTimeout(() => setShowSplash(false), 1200);
+              }
+            }}
             className="px-5 py-2.5 rounded-t-lg font-semibold text-sm transition-all duration-100 border-b-2 focus:outline-none"
             style={tabActiva === tab.value
               ? { background: cardBg, borderColor: '#8b5cf6', color: '#8b5cf6', borderBottom: '2px solid #8b5cf6' }
@@ -2748,7 +2690,13 @@ function PantallaHistorial() {
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
         <select
           value={filtroDia}
-          onChange={e => setFiltroDia(e.target.value)}
+          onChange={e => {
+            if (filtroDia !== e.target.value) {
+              setShowSplash(true);
+              setFiltroDia(e.target.value);
+              setTimeout(() => setShowSplash(false), 1200);
+            }
+          }}
           style={{ padding: '7px 12px', borderRadius: '8px', border: `1px solid ${border}`, background: cardBg, color: textPrimary, fontSize: '13px', cursor: 'pointer', outline: 'none' }}
         >
           <option value="TODOS">Todos los días</option>
@@ -2774,156 +2722,160 @@ function PantallaHistorial() {
 
       {loadingHist ? (
         <div style={{ textAlign: 'center', padding: '60px', color: textSecondary }}>⏳ Cargando historial...</div>
-      ) : tabActiva === 'recorridos' ? (
-        /* ── TAB RECORRIDOS ── */
-        recAgrupadosPorFecha.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: textSecondary }}>
-            <Archive size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-            <p style={{ fontSize: '16px', fontWeight: '500', color: textPrimary }}>No hay historial de recorridos aún</p>
-            <p style={{ fontSize: '13px' }}>Guardá las tablas del día desde la pantalla de Recorridos</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {recAgrupadosPorFecha.map(grupo => {
-              const key = `${grupo.fecha}__${grupo.tipo_dia}`;
-              const totalPqtes = grupo.items.reduce((s, r) => s + (r.pqte_dia || 0) + (r.por_fuera || 0), 0);
-              const totalEnt = grupo.items.reduce((s, r) => s + (r.entregados || 0), 0);
-              const pctGlobal = totalPqtes > 0 ? ((totalEnt / totalPqtes) * 100).toFixed(1) : 0;
-              const tipoLabel = grupo.tipo_dia === 'SÁBADOS' ? 'Sábados' : 'Lunes a Viernes';
-
-              return (
-                <div key={key} style={{ backgroundColor: cardBg, borderRadius: '12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.07)' : '0 4px 12px rgba(0,0,0,0.25)' }}>
-                  {/* CABECERA DEL BLOQUE */}
-                  <div style={{ padding: '14px 20px', background: theme === 'light' ? '#f8fafc' : '#0f172a', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <CalendarDays size={18} color="#8b5cf6" />
-                      <span style={{ fontWeight: '700', fontSize: '15px', color: textPrimary }}>{formatFecha(grupo.fecha)}</span>
-                      <span style={{ fontSize: '12px', padding: '2px 10px', borderRadius: '20px', background: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d420' : '#f59e0b20', color: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', fontWeight: '600', border: `1px solid ${grupo.tipo_dia === 'SÁBADOS' ? '#06b6d440' : '#f59e0b40'}` }}>
-                        {tipoLabel}
-                      </span>
-                      <span style={{ fontSize: '13px', color: textSecondary }}>{grupo.items.length} rutas</span>
-                      <span style={{ fontSize: '13px', fontWeight: '700', color: getPctColor(parseFloat(pctGlobal)) }}>{pctGlobal}% global</span>
-                    </div>
-                    <button
-                      onClick={() => exportarPDF(grupo)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '7px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                    >
-                      <Download size={14} />
-                      Descargar PDF
-                    </button>
-                  </div>
-
-                  {/* TABLA */}
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                      <thead>
-                        <tr style={{ background: headerBg, borderBottom: `1px solid ${border}` }}>
-                          {['ID', 'Zona', 'Localidad', 'ID CHF', 'Pqte Día', 'Por Fuera', 'Entregados', '% Día'].map(h => (
-                            <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Localidad' ? 'left' : 'center', color: textSecondary, fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px', whiteSpace: 'nowrap' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {grupo.items.map((r, i) => {
-                          const total = (r.pqte_dia || 0) + (r.por_fuera || 0);
-                          const pct = total > 0 ? parseFloat(((r.entregados || 0) / total * 100).toFixed(1)) : 0;
-                          const pctColor = getPctColor(pct);
-                          return (
-                            <tr key={r.id || i} style={{ borderBottom: `1px solid ${border}`, background: i % 2 === 0 ? cardBg : (theme === 'light' ? '#f9fafb' : '#141e2e') }}>
-                              <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-                                <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: '700', color: '#8b5cf6', background: '#8b5cf620', padding: '2px 6px', borderRadius: '4px' }}>{r.id_ruta}</span>
-                              </td>
-                              <td style={{ padding: '9px 12px', textAlign: 'center', fontSize: '11px', fontWeight: '600', color: textSecondary }}>{r.zona}</td>
-                              <td style={{ padding: '9px 12px', fontWeight: '500', color: textPrimary }}>{r.localidad}</td>
-                              <td style={{ padding: '9px 12px', textAlign: 'center', color: textSecondary }}>{r.id_chofer || '—'}</td>
-                              <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: '600', color: textPrimary }}>{r.pqte_dia || 0}</td>
-                              <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: '600', color: textPrimary }}>{r.por_fuera || 0}</td>
-                              <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: '600', color: textPrimary }}>{r.entregados || 0}</td>
-                              <td style={{ padding: '9px 12px', textAlign: 'center' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                                  <span style={{ fontWeight: '700', fontSize: '13px', color: pctColor }}>{total > 0 ? pct + '%' : '—'}</span>
-                                  {total > 0 && <div style={{ width: '44px', height: '3px', borderRadius: '2px', background: `${pctColor}25`, overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: pctColor, borderRadius: '2px' }} /></div>}
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
       ) : (
-        /* ── TAB CLIENTES ── */
-        cliAgrupadosPorFecha.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px', color: textSecondary }}>
-            <ClipboardList size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
-            <p style={{ fontSize: '16px', fontWeight: '500', color: textPrimary }}>No hay historial de clientes aún</p>
-            <p style={{ fontSize: '13px' }}>Marcá las llegadas con el checkbox en la pantalla de Clientes y guardá en historial</p>
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gap: '20px' }}>
-            {cliAgrupadosPorFecha.map(grupo => {
-              const key = `${grupo.fecha}__${grupo.tipo_dia}`;
-              const tipoLabel = grupo.tipo_dia === 'SÁBADOS' ? 'Sábados' : 'Lunes a Viernes';
-              return (
-                <div key={key} style={{ backgroundColor: cardBg, borderRadius: '12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.07)' : '0 4px 12px rgba(0,0,0,0.25)' }}>
-                  <div style={{ padding: '14px 20px', background: theme === 'light' ? '#f8fafc' : '#0f172a', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <Clock size={18} color="#10b981" />
-                      <span style={{ fontWeight: '700', fontSize: '15px', color: textPrimary }}>{formatFecha(grupo.fecha)}</span>
-                      <span style={{ fontSize: '12px', padding: '2px 10px', borderRadius: '20px', background: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d420' : '#10b98120', color: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d4' : '#10b981', fontWeight: '600', border: `1px solid ${grupo.tipo_dia === 'SÁBADOS' ? '#06b6d440' : '#10b98140'}` }}>
-                        {tipoLabel}
-                      </span>
-                      <span style={{ fontSize: '13px', color: textSecondary }}>{grupo.items.length} llegadas</span>
+        <div key={`${tabActiva}-${filtroDia}`} className="animate-fade-slide">
+          {tabActiva === 'recorridos' ? (
+            /* ── TAB RECORRIDOS ── */
+            recAgrupadosPorFecha.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px', color: textSecondary }}>
+                <Archive size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                <p style={{ fontSize: '16px', fontWeight: '500', color: textPrimary }}>No hay historial de recorridos aún</p>
+                <p style={{ fontSize: '13px' }}>Guardá las tablas del día desde la pantalla de Recorridos</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {recAgrupadosPorFecha.map(grupo => {
+                  const key = `${grupo.fecha}__${grupo.tipo_dia}`;
+                  const totalPqtes = grupo.items.reduce((s, r) => s + (r.pqte_dia || 0) + (r.por_fuera || 0), 0);
+                  const totalEnt = grupo.items.reduce((s, r) => s + (r.entregados || 0), 0);
+                  const pctGlobal = totalPqtes > 0 ? ((totalEnt / totalPqtes) * 100).toFixed(1) : 0;
+                  const tipoLabel = grupo.tipo_dia === 'SÁBADOS' ? 'Sábados' : 'Lunes a Viernes';
+
+                  return (
+                    <div key={key} style={{ backgroundColor: cardBg, borderRadius: '12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.07)' : '0 4px 12px rgba(0,0,0,0.25)' }}>
+                      {/* CABECERA DEL BLOQUE */}
+                      <div style={{ padding: '14px 20px', background: theme === 'light' ? '#f8fafc' : '#0f172a', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <CalendarDays size={18} color="#8b5cf6" />
+                          <span style={{ fontWeight: '700', fontSize: '15px', color: textPrimary }}>{formatFecha(grupo.fecha)}</span>
+                          <span style={{ fontSize: '12px', padding: '2px 10px', borderRadius: '20px', background: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d420' : '#f59e0b20', color: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', fontWeight: '600', border: `1px solid ${grupo.tipo_dia === 'SÁBADOS' ? '#06b6d440' : '#f59e0b40'}` }}>
+                            {tipoLabel}
+                          </span>
+                          <span style={{ fontSize: '13px', color: textSecondary }}>{grupo.items.length} rutas</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: getPctColor(parseFloat(pctGlobal)) }}>{pctGlobal}% global</span>
+                        </div>
+                        <button
+                          onClick={() => exportarPDF(grupo)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '7px', border: 'none', background: '#8b5cf6', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                        >
+                          <Download size={14} />
+                          Descargar PDF
+                        </button>
+                      </div>
+
+                      {/* TABLA */}
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ background: headerBg, borderBottom: `1px solid ${border}` }}>
+                              {['ID', 'Zona', 'Localidad', 'ID CHF', 'Pqte Día', 'Por Fuera', 'Entregados', '% Día'].map(h => (
+                                <th key={h} style={{ padding: '9px 12px', textAlign: h === 'Localidad' ? 'left' : 'center', color: textSecondary, fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px', whiteSpace: 'nowrap' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {grupo.items.map((r, i) => {
+                              const total = (r.pqte_dia || 0) + (r.por_fuera || 0);
+                              const pct = total > 0 ? parseFloat(((r.entregados || 0) / total * 100).toFixed(1)) : 0;
+                              const pctColor = getPctColor(pct);
+                              return (
+                                <tr key={r.id || i} style={{ borderBottom: `1px solid ${border}`, background: i % 2 === 0 ? cardBg : (theme === 'light' ? '#f9fafb' : '#141e2e') }}>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+                                    <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: '700', color: '#8b5cf6', background: '#8b5cf620', padding: '2px 6px', borderRadius: '4px' }}>{r.id_ruta}</span>
+                                  </td>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center', fontSize: '11px', fontWeight: '600', color: textSecondary }}>{r.zona}</td>
+                                  <td style={{ padding: '9px 12px', fontWeight: '500', color: textPrimary }}>{r.localidad}</td>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center', color: textSecondary }}>{r.id_chofer || '—'}</td>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: '600', color: textPrimary }}>{r.pqte_dia || 0}</td>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: '600', color: textPrimary }}>{r.por_fuera || 0}</td>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center', fontWeight: '600', color: textPrimary }}>{r.entregados || 0}</td>
+                                  <td style={{ padding: '9px 12px', textAlign: 'center' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                                      <span style={{ fontWeight: '700', fontSize: '13px', color: pctColor }}>{total > 0 ? pct + '%' : '—'}</span>
+                                      {total > 0 && <div style={{ width: '44px', height: '3px', borderRadius: '2px', background: `${pctColor}25`, overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: pctColor, borderRadius: '2px' }} /></div>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => exportarPDFClientes(grupo)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '7px', border: 'none', background: '#10b981', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.15s' }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                    >
-                      <Download size={14} />
-                      Descargar PDF
-                    </button>
-                  </div>
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                      <thead>
-                        <tr style={{ background: headerBg, borderBottom: `1px solid ${border}` }}>
-                          {['Cliente', 'Chofer', 'Horario Prog.', 'Hora Llegada', 'Dirección'].map(h => (
-                            <th key={h} style={{ padding: '9px 14px', textAlign: 'left', color: textSecondary, fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {grupo.items.map((r, i) => (
-                          <tr key={r.id || i} style={{ borderBottom: `1px solid ${border}`, background: i % 2 === 0 ? cardBg : (theme === 'light' ? '#f9fafb' : '#141e2e') }}>
-                            <td style={{ padding: '9px 14px', fontWeight: '600', color: textPrimary }}>{r.cliente_nombre}</td>
-                            <td style={{ padding: '9px 14px', color: textSecondary }}>{r.chofer || '—'}</td>
-                            <td style={{ padding: '9px 14px', color: textSecondary }}>{r.horario_programado || '—'}</td>
-                            <td style={{ padding: '9px 14px' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '700', fontSize: '13px', color: '#10b981', background: '#10b98115', padding: '3px 10px', borderRadius: '20px', border: '1px solid #10b98130' }}>
-                                <Clock size={12} />
-                                {r.hora_llegada}
-                              </span>
-                            </td>
-                            <td style={{ padding: '9px 14px', color: textSecondary, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.direccion || '—'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            /* ── TAB CLIENTES ── */
+            cliAgrupadosPorFecha.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px', color: textSecondary }}>
+                <ClipboardList size={48} style={{ margin: '0 auto 12px', opacity: 0.4 }} />
+                <p style={{ fontSize: '16px', fontWeight: '500', color: textPrimary }}>No hay historial de clientes aún</p>
+                <p style={{ fontSize: '13px' }}>Marcá las llegadas con el checkbox en la pantalla de Clientes y guardá en historial</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: '20px' }}>
+                {cliAgrupadosPorFecha.map(grupo => {
+                  const key = `${grupo.fecha}__${grupo.tipo_dia}`;
+                  const tipoLabel = grupo.tipo_dia === 'SÁBADOS' ? 'Sábados' : 'Lunes a Viernes';
+                  return (
+                    <div key={key} style={{ backgroundColor: cardBg, borderRadius: '12px', border: `1px solid ${border}`, overflow: 'hidden', boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.07)' : '0 4px 12px rgba(0,0,0,0.25)' }}>
+                      <div style={{ padding: '14px 20px', background: theme === 'light' ? '#f8fafc' : '#0f172a', borderBottom: `1px solid ${border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <Clock size={18} color="#10b981" />
+                          <span style={{ fontWeight: '700', fontSize: '15px', color: textPrimary }}>{formatFecha(grupo.fecha)}</span>
+                          <span style={{ fontSize: '12px', padding: '2px 10px', borderRadius: '20px', background: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d420' : '#10b98120', color: grupo.tipo_dia === 'SÁBADOS' ? '#06b6d4' : '#10b981', fontWeight: '600', border: `1px solid ${grupo.tipo_dia === 'SÁBADOS' ? '#06b6d440' : '#10b98140'}` }}>
+                            {tipoLabel}
+                          </span>
+                          <span style={{ fontSize: '13px', color: textSecondary }}>{grupo.items.length} llegadas</span>
+                        </div>
+                        <button
+                          onClick={() => exportarPDFClientes(grupo)}
+                          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 14px', borderRadius: '7px', border: 'none', background: '#10b981', color: 'white', fontSize: '12px', fontWeight: '600', cursor: 'pointer', transition: 'opacity 0.15s' }}
+                          onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
+                          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                        >
+                          <Download size={14} />
+                          Descargar PDF
+                        </button>
+                      </div>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ background: headerBg, borderBottom: `1px solid ${border}` }}>
+                              {['Cliente', 'Chofer', 'Horario Prog.', 'Hora Llegada', 'Dirección'].map(h => (
+                                <th key={h} style={{ padding: '9px 14px', textAlign: 'left', color: textSecondary, fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {grupo.items.map((r, i) => (
+                              <tr key={r.id || i} style={{ borderBottom: `1px solid ${border}`, background: i % 2 === 0 ? cardBg : (theme === 'light' ? '#f9fafb' : '#141e2e') }}>
+                                <td style={{ padding: '9px 14px', fontWeight: '600', color: textPrimary }}>{r.cliente_nombre}</td>
+                                <td style={{ padding: '9px 14px', color: textSecondary }}>{r.chofer || '—'}</td>
+                                <td style={{ padding: '9px 14px', color: textSecondary }}>{r.horario_programado || '—'}</td>
+                                <td style={{ padding: '9px 14px' }}>
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontWeight: '700', fontSize: '13px', color: '#10b981', background: '#10b98115', padding: '3px 10px', borderRadius: '20px', border: '1px solid #10b98130' }}>
+                                    <Clock size={12} />
+                                    {r.hora_llegada}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '9px 14px', color: textSecondary, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.direccion || '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
+        </div>
       )}
 
       <ModalConfirmacion
@@ -2942,6 +2894,4 @@ function PantallaHistorial() {
     </div>
   );
 }
-
-
 export default App;

@@ -5,12 +5,13 @@
 // Lee: tabla Choferes (columnas: latitud, longitud, ultima_actualizacion)
 // ──────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useContext, memo } from 'react';
 import { MapContainer, Marker, Popup, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../supabase';
+import { AppContext } from '../App';
 
 // ──────────────────────────────────────────────────────────────────
 // FIX: Leaflet pierde sus íconos default con bundlers (Vite/Webpack)
@@ -126,9 +127,61 @@ function MapResizer({ panelExpandido }) {
 }
 
 // ──────────────────────────────────────────────────────────────────
+// SUBCOMPONENTE MEMOIZADO: Ítem de la lista del panel lateral
+// Sin memo → se re-renderiza 100 veces cuando cambia tick o choferSeleccionado
+// Con memo → solo re-renderiza si cambian sus props
+// ──────────────────────────────────────────────────────────────────
+const ChoferItem = memo(({ chofer, esSeleccionado, onClick }) => {
+  const estado = getEstado(chofer.latitud, chofer.ultima_actualizacion);
+  const color = COLORES_ESTADO[estado];
+  const tieneGPS = chofer.latitud != null;
+
+  return (
+    <button
+      onClick={() => onClick(chofer)}
+      style={{
+        width: '100%', textAlign: 'left', padding: '10px 12px',
+        marginBottom: '4px', borderRadius: '10px', border: 'none',
+        background: esSeleccionado ? `${color}15` : 'transparent',
+        outline: esSeleccionado ? `1.5px solid ${color}50` : 'none',
+        cursor: tieneGPS ? 'pointer' : 'default',
+        display: 'flex', alignItems: 'center', gap: '10px',
+        transition: 'background 0.18s ease',
+        opacity: tieneGPS ? 1 : 0.55,
+      }}
+      onMouseEnter={e => tieneGPS && !esSeleccionado && (e.currentTarget.style.background = `${color}10`)}
+      onMouseLeave={e => !esSeleccionado && (e.currentTarget.style.background = 'transparent')}
+    >
+      <div style={{
+        width: '10px', height: '10px', borderRadius: '50%',
+        background: color, flexShrink: 0,
+        boxShadow: `0 0 6px ${color}80`,
+        animation: estado === 'activo' ? 'pulseGPS 2s ease-in-out infinite' : 'none',
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {chofer.nombre}
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span style={{ color }}>{LABELS_ESTADO[estado]}</span>
+          {chofer.ultima_actualizacion && (
+            <span>· {formatTiempo(chofer.ultima_actualizacion)}</span>
+          )}
+        </div>
+      </div>
+      {tieneGPS && (
+        <span style={{ fontSize: '12px', color: 'var(--text-3)', flexShrink: 0 }}>📍</span>
+      )}
+    </button>
+  );
+});
+
+// ──────────────────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ──────────────────────────────────────────────────────────────────
 export function PantallaMaps() {
+  const { theme } = useContext(AppContext);
+  const isDark = theme === 'dark';
   const [choferes, setChoferes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -433,64 +486,14 @@ export function PantallaMaps() {
                 }
               </div>
             ) : (
-              choferesFiltrados.map(chofer => {
-                const estado = getEstado(chofer.latitud, chofer.ultima_actualizacion);
-                const color = COLORES_ESTADO[estado];
-                const esSeleccionado = choferSeleccionado?.id === chofer.id;
-                const tieneGPS = chofer.latitud != null;
-
-                return (
-                  <button
-                    key={chofer.id}
-                    onClick={() => handleClickChofer(chofer)}
-                    style={{
-                      width: '100%', textAlign: 'left', padding: '10px 12px',
-                      marginBottom: '4px', borderRadius: '10px', border: 'none',
-                      background: esSeleccionado ? `${color}15` : 'transparent',
-                      outline: esSeleccionado ? `1.5px solid ${color}50` : 'none',
-                      cursor: tieneGPS ? 'pointer' : 'default',
-                      display: 'flex', alignItems: 'center', gap: '10px',
-                      transition: 'all 0.15s ease',
-                      opacity: tieneGPS ? 1 : 0.55,
-                    }}
-                    onMouseEnter={e => tieneGPS && (e.currentTarget.style.background = `${color}10`)}
-                    onMouseLeave={e => !esSeleccionado && (e.currentTarget.style.background = 'transparent')}
-                  >
-                    {/* Indicador de estado */}
-                    <div style={{
-                      width: '10px', height: '10px', borderRadius: '50%',
-                      background: color, flexShrink: 0,
-                      boxShadow: `0 0 6px ${color}80`,
-                      animation: estado === 'activo' ? 'pulseGPS 2s ease-in-out infinite' : 'none',
-                    }} />
-
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: '13px', fontWeight: '600',
-                        color: 'var(--text-1)', whiteSpace: 'nowrap',
-                        overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {chofer.nombre}
-                      </div>
-                      <div style={{
-                        fontSize: '11px', color: 'var(--text-3)',
-                        marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px',
-                      }}>
-                        <span style={{ color }}>{LABELS_ESTADO[estado]}</span>
-                        {chofer.ultima_actualizacion && (
-                          <span>· {formatTiempo(chofer.ultima_actualizacion)}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {tieneGPS && (
-                      <span style={{ fontSize: '12px', color: 'var(--text-3)', flexShrink: 0 }}>
-                        📍
-                      </span>
-                    )}
-                  </button>
-                );
-              })
+              choferesFiltrados.map(chofer => (
+                <ChoferItem
+                  key={chofer.id}
+                  chofer={chofer}
+                  esSeleccionado={choferSeleccionado?.id === chofer.id}
+                  onClick={handleClickChofer}
+                />
+              ))
             )}
           </div>
         )}
@@ -577,8 +580,11 @@ export function PantallaMaps() {
           zoomControl={false}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+            url={isDark
+              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            }
           />
 
           {/* ClusterGroup agrupa pines cercanos al hacer zoom out */}

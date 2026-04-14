@@ -1,8 +1,34 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck } from 'lucide-react';
 import '../styles/sidebar.css';
-
 import { supabase } from '../supabase';
+
+// ── Inyectar keyframes UNA sola vez al cargar el módulo ──────────
+// El <style> dentro del map() se re-inyectaba N veces × cada render
+if (typeof document !== 'undefined' && !document.getElementById('sb-badge-kf')) {
+  const s = document.createElement('style');
+  s.id = 'sb-badge-kf';
+  s.textContent = `
+    @keyframes badgePop {
+      from { transform: scale(0) rotate(-10deg); opacity: 0; }
+      70%  { transform: scale(1.2) rotate(3deg);  opacity: 1; }
+      to   { transform: scale(1)   rotate(0deg);  opacity: 1; }
+    }
+    @keyframes badgePulse {
+      0%,100% { box-shadow: 0 0 0 0   rgba(239,68,68,0.45); }
+      50%     { box-shadow: 0 0 0 5px rgba(239,68,68,0);    }
+    }
+    @keyframes livePulse {
+      0%,100% { opacity:1; transform:scale(1);    }
+      50%     { opacity:.5; transform:scale(0.82); }
+    }
+  `;
+  document.head.appendChild(s);
+}
+
+// Constantes fuera del componente — no se recalculan en cada render
+const SHADOW_DARK = 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
+const SHADOW_LIGHT = 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))';
 
 export function Sidebar({
   currentPage,
@@ -75,10 +101,7 @@ export function Sidebar({
 
   const navItems = allNavItems.filter(item => isAdmin || item.alwaysVisible);
 
-  const iconVolumeShadow =
-    theme === 'light'
-      ? 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))'
-      : 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
+  const iconVolumeShadow = theme === 'light' ? SHADOW_LIGHT : SHADOW_DARK;
 
   // En móviles, mostrar como overlay
   if (isMobile) {
@@ -208,16 +231,6 @@ export function Sidebar({
 
       {/* NAVEGACIÓN */}
       <div className="nav-links">
-        <style>{`
-          @keyframes badgePop {
-            from { transform: scale(0); opacity: 0; }
-            to   { transform: scale(1); opacity: 1; }
-          }
-          @keyframes badgePulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
-            50%       { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
-          }
-        `}</style>
         {navItems.map((item) => {
           const NavIcon = item.icon;
           const showBadge = item.id === 'chat' && unreadCount > 0;
@@ -281,17 +294,11 @@ export function Sidebar({
 
         <button
           onClick={() => supabase.auth.signOut()}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'flex-start', gap: '8px',
-            width: '100%', padding: isCollapsed ? '12px 0' : '12px 16px', background: 'transparent',
-            border: `1px solid ${theme === 'light' ? '#ef444430' : '#ef444430'}`,
-            color: '#ef4444', borderRadius: '12px', fontWeight: '600', cursor: 'pointer',
-            transition: 'all 0.2s'
-          }}
+          className="sidebar-logout-btn"
           title="Cerrar sesión"
         >
           <LogOut size={20} />
-          {!isCollapsed && <span>Cerrar sesión</span>}
+          <span className="nav-label">Cerrar sesión</span>
         </button>
       </div>
     </nav>

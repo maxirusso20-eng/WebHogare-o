@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, createContext, useRef, useContext } from 'react';
+import { useState, memo, useEffect, useCallback, useMemo, createContext, useRef, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from './supabase';
 import './index.css';
@@ -539,7 +539,6 @@ function PantallaRecorridos() {
         'postgres_changes',
         { event: '*', schema: 'public', table: tablaActual },
         (payload) => {
-          console.log(`🔴 Realtime [${tablaActual}]:`, payload.eventType, payload);
           // Re-fetch completo para mantener orden correcto desde BD
           fetchRecorridos();
         }
@@ -553,14 +552,14 @@ function PantallaRecorridos() {
   }, [tabActiva, tablaActual]);
 
   // FUNCIÓN PARA OBTENER NOMBRE DEL CHOFER POR ID
-  const obtenerNombreChofer = (idChofer) => {
+  const obtenerNombreChofer = useCallback((idChofer) => {
     if (!idChofer) return '—';
     const chofer = choferes.find(c => c.id === idChofer);
     return chofer ? chofer.nombre : 'No encontrado';
-  };
+  }, [choferes]);
 
   // COLORES SEGÚN TEMA
-  const colors = {
+  const colors = useMemo(() => ({
     backgroundColor: theme === 'light' ? '#f8fafc' : '#020617',
     cardBg: theme === 'light' ? '#ffffff' : '#1e293b',
     headerBg: theme === 'light' ? '#f1f5f9' : '#0f172a',
@@ -572,7 +571,7 @@ function PantallaRecorridos() {
     rowHover: theme === 'light' ? '#f0f4f8' : '#263447',
     inputBg: theme === 'light' ? '#f8fafc' : '#0f172a',
     inputFocusBg: theme === 'light' ? '#ffffff' : '#1a2540'
-  };
+  }), [theme]);
 
   // DND SENSORS
   const sensors = useSensors(
@@ -875,8 +874,7 @@ function PantallaRecorridos() {
                     borderRadius: '12px',
                     boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.08)' : '0 4px 12px rgba(0, 0, 0, 0.3)',
                     overflow: 'visible',
-                    border: `1px solid ${colors.border}`,
-                    transition: 'all 0.2s ease'
+                    border: `1px solid ${colors.border}`
                   }}
                 >
                   {/* HEADER DE ZONA */}
@@ -923,7 +921,7 @@ function PantallaRecorridos() {
                         fontSize: '13px',
                         fontWeight: '600',
                         cursor: 'pointer',
-                        transition: 'all 0.2s ease'
+                        transition: 'background-color 100ms ease, transform 120ms ease'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.backgroundColor = `${zoneColor}40`;
@@ -1156,7 +1154,6 @@ function PantallaRecorridos() {
                             fontSize: '13px',
                             fontWeight: '600',
                             cursor: 'pointer',
-                            transition: 'all 0.2s ease',
                             opacity: '0.8'
                           }}
                           onMouseEnter={(e) => {
@@ -1421,7 +1418,7 @@ function PantallaChoferes() {
 // ════════════════════════════════════════════════════════════════
 // COMBOBOX DE CHOFER — Fila de tabla (autocomplete inline)
 // ════════════════════════════════════════════════════════════════
-function ChoferComboboxRow({ value, choferes, onChange }) {
+const ChoferComboboxRow = memo(function ChoferComboboxRow({ value, choferes, onChange }) {
   const [inputVal, setInputVal] = useState(value || '');
   const [open, setOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
@@ -1481,7 +1478,7 @@ function ChoferComboboxRow({ value, choferes, onChange }) {
   };
 
   return (
-    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block', flexShrink: 0 }}>
       <input
         ref={inputRef}
         type="text"
@@ -1550,7 +1547,7 @@ function ChoferComboboxRow({ value, choferes, onChange }) {
       )}
     </div>
   );
-}
+});
 
 // ════════════════════════════════════════════════════════════════
 // DROPDOWN CUSTOM — Filtro de chofer con buscador (header filtros)
@@ -1672,6 +1669,25 @@ function ChoferDropdown({ choferes, value, onChange }) {
   );
 }
 
+// Funciones puras fuera del componente — no se recrean en cada render
+function parseHorario(horario) {
+  if (!horario) return null;
+  const match = horario.match(/(\d{1,2}):(\d{2})/);
+  if (!match) return null;
+  const [_, h, m] = match;
+  return parseInt(h, 10) * 60 + parseInt(m, 10);
+}
+function ordenarPorHorario(arr) {
+  return [...arr].sort((a, b) => {
+    const ha = parseHorario(a.horario);
+    const hb = parseHorario(b.horario);
+    if (ha === null && hb === null) return 0;
+    if (ha === null) return 1;
+    if (hb === null) return -1;
+    return ha - hb;
+  });
+}
+
 function PantallaClientes() {
 
   const { clientes, setClientes, mostrarToast, choferes, theme, setShowSplash } = useContext(AppContext);
@@ -1687,38 +1703,11 @@ function PantallaClientes() {
   // llegadas: { [clienteId]: 'HH:MM' | null }
   const [llegadas, setLlegadas] = useState({});
 
-  // Limpiar/refiltrar clientes al cambiar de pestaña
-  useEffect(() => {
-    // Forzar refiltrado limpiando algún estado si fuera necesario (aquí solo log)
-    console.log('Pestaña activa:', tabActiva);
-  }, [tabActiva]);
-
   // Tabs config
   const tabs = [
     { label: 'LUNES A VIERNES', value: 'SEMANA' },
     { label: 'SÁBADOS', value: 'SÁBADOS' }
   ];
-
-  // Ordenamiento inteligente por horario
-  function parseHorario(horario) {
-    if (!horario) return null;
-    // Extrae HH:MM
-    const match = horario.match(/(\d{1,2}):(\d{2})/);
-    if (!match) return null;
-    const [_, h, m] = match;
-    return parseInt(h, 10) * 60 + parseInt(m, 10);
-  }
-
-  function ordenarPorHorario(arr) {
-    return [...arr].sort((a, b) => {
-      const ha = parseHorario(a.horario);
-      const hb = parseHorario(b.horario);
-      if (ha === null && hb === null) return 0;
-      if (ha === null) return 1;
-      if (hb === null) return -1;
-      return ha - hb;
-    });
-  }
 
   // Filtro ultra-flexible para tipo_dia + chofer + búsqueda
   const clientesFiltrados = useMemo(() => {
@@ -2006,7 +1995,7 @@ function PantallaClientes() {
                   <tr
                     key={cliente.id || idx}
                     className="table-row-animated group"
-                    style={{ borderBottom: '1px solid var(--border)', transition: 'background-color 0.2s ease' }}
+                    style={{ borderBottom: '1px solid var(--border)' }}
                   >
                     <td className="px-6 py-4 text-[15px] font-bold" style={{ color: 'var(--text-1)' }}>{cliente.cliente || 'N/A'}</td>
                     <td className="px-6 py-4 text-[14px] font-medium" style={{ color: 'var(--text-2)' }}>
@@ -2165,7 +2154,6 @@ function CeldaLocalidadEditable({ item, colors, zoneColor, onSave }) {
           fontWeight: '600',
           outline: 'none',
           boxShadow: `0 0 0 3px ${zoneColor}25`,
-          transition: 'all 0.2s ease',
         }}
       />
     );
@@ -2242,7 +2230,6 @@ function SortableFilaLocalidad({
     fontWeight: '500',
     outline: 'none',
     textAlign: 'center',
-    transition: 'all 0.2s ease',
   };
 
   return (
@@ -2396,7 +2383,7 @@ function SortableFilaLocalidad({
               guardarCambioBD(item.id, 'entregadosFuera', 0);
             }
           }}
-          style={{ padding: '6px 8px', border: `1px solid ${colors.borderLight}`, borderRadius: '6px', backgroundColor: colors.inputBg, color: '#f59e0b', fontSize: '13px', fontWeight: '600', outline: 'none', textAlign: 'center', transition: 'all 0.2s ease', width: '62px' }}
+          style={{ padding: '6px 8px', border: `1px solid ${colors.borderLight}`, borderRadius: '6px', backgroundColor: colors.inputBg, color: '#f59e0b', fontSize: '13px', fontWeight: '600', outline: 'none', textAlign: 'center', width: '62px' }}
           onFocus={(e) => { e.target.style.borderColor = '#f59e0b'; e.target.style.boxShadow = '0 0 0 3px rgba(245,158,11,0.2)'; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
         />

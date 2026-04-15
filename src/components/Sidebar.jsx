@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, memo } from 'react';
-import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck, Navigation } from 'lucide-react';
+import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck } from 'lucide-react';
 import '../styles/sidebar.css';
 import { supabase } from '../supabase';
 
@@ -72,7 +72,6 @@ function SidebarComponent({
       { id: 'recorridos', label: 'Recorridos', icon: Route, alwaysVisible: true },
       { id: 'historial', label: 'Historial', icon: BookOpen, alwaysVisible: false },
       { id: 'maps',     label: 'Maps',    icon: Globe,        alwaysVisible: true  },
-      { id: 'ruteador', label: 'Mi Ruta', icon: Navigation,   alwaysVisible: true  },
       { id: 'chat',     label: 'Chat',    icon: MessageSquare, alwaysVisible: true  },
     ];
     if (isSuperAdmin) {

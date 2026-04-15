@@ -77,7 +77,7 @@
   gap: 12px;
   transition:
     transform 170ms cubic-bezier(0.34, 1.25, 0.64, 1),
-    background-color 100ms ease;
+    background-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform;
   position: relative;
   overflow: visible;
@@ -99,9 +99,9 @@
   stroke-width: 2;
   filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.35));
   transition:
-    color 110ms ease,
+    color   300ms cubic-bezier(0.4, 0, 0.2, 1),
     transform 190ms cubic-bezier(0.34, 1.25, 0.64, 1),
-    filter 110ms ease;
+    filter  300ms cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, filter;
   flex-shrink: 0;
 }

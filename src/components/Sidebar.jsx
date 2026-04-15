@@ -1,36 +1,16 @@
-import { useState, useEffect } from 'react';
-import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck } from 'lucide-react';
+import { useState, useEffect, useMemo, memo } from 'react';
+import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck, Navigation } from 'lucide-react';
 import '../styles/sidebar.css';
 import { supabase } from '../supabase';
 
-// ── Inyectar keyframes UNA sola vez al cargar el módulo ──────────
-// El <style> dentro del map() se re-inyectaba N veces × cada render
-if (typeof document !== 'undefined' && !document.getElementById('sb-badge-kf')) {
-  const s = document.createElement('style');
-  s.id = 'sb-badge-kf';
-  s.textContent = `
-    @keyframes badgePop {
-      from { transform: scale(0) rotate(-10deg); opacity: 0; }
-      70%  { transform: scale(1.2) rotate(3deg);  opacity: 1; }
-      to   { transform: scale(1)   rotate(0deg);  opacity: 1; }
-    }
-    @keyframes badgePulse {
-      0%,100% { box-shadow: 0 0 0 0   rgba(239,68,68,0.45); }
-      50%     { box-shadow: 0 0 0 5px rgba(239,68,68,0);    }
-    }
-    @keyframes livePulse {
-      0%,100% { opacity:1; transform:scale(1);    }
-      50%     { opacity:.5; transform:scale(0.82); }
-    }
-  `;
-  document.head.appendChild(s);
-}
+// ── Los keyframes (badgePop, badgePulse, livePulse) están definidos
+// ── en sidebar.css — no se inyectan dinámicamente.
 
 // Constantes fuera del componente — no se recalculan en cada render
 const SHADOW_DARK = 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
 const SHADOW_LIGHT = 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))';
 
-export function Sidebar({
+function SidebarComponent({
   currentPage,
   setCurrentPage,
   theme,
@@ -83,23 +63,23 @@ export function Sidebar({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isMobile, isMobileOpen, isCollapsed]);
 
-  // Si estamos en móvil, mostrar antes de navItems
-
-  const allNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, alwaysVisible: true },
-    { id: 'clientes', label: 'Clientes', icon: UsersRound, alwaysVisible: false },
-    { id: 'choferes', label: 'Choferes', icon: CarFront, alwaysVisible: false },
-    { id: 'recorridos', label: 'Recorridos', icon: Route, alwaysVisible: true },
-    { id: 'historial', label: 'Historial', icon: BookOpen, alwaysVisible: false },
-    { id: 'maps', label: 'Maps', icon: Globe, alwaysVisible: true },
-    { id: 'chat', label: 'Chat', icon: MessageSquare, alwaysVisible: true },
-  ];
-
-  if (isSuperAdmin) {
-    allNavItems.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, alwaysVisible: false });
-  }
-
-  const navItems = allNavItems.filter(item => isAdmin || item.alwaysVisible);
+  // navItems: solo se recalcula si cambia isAdmin o isSuperAdmin (raramente)
+  const navItems = useMemo(() => {
+    const items = [
+      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, alwaysVisible: true },
+      { id: 'clientes', label: 'Clientes', icon: UsersRound, alwaysVisible: false },
+      { id: 'choferes', label: 'Choferes', icon: CarFront, alwaysVisible: false },
+      { id: 'recorridos', label: 'Recorridos', icon: Route, alwaysVisible: true },
+      { id: 'historial', label: 'Historial', icon: BookOpen, alwaysVisible: false },
+      { id: 'maps',     label: 'Maps',    icon: Globe,        alwaysVisible: true  },
+      { id: 'ruteador', label: 'Mi Ruta', icon: Navigation,   alwaysVisible: true  },
+      { id: 'chat',     label: 'Chat',    icon: MessageSquare, alwaysVisible: true  },
+    ];
+    if (isSuperAdmin) {
+      items.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, alwaysVisible: false });
+    }
+    return isAdmin ? items : items.filter(item => item.alwaysVisible);
+  }, [isAdmin, isSuperAdmin]);
 
   const iconVolumeShadow = theme === 'light' ? SHADOW_LIGHT : SHADOW_DARK;
 
@@ -304,3 +284,7 @@ export function Sidebar({
     </nav>
   );
 }
+
+// Memoizar el Sidebar: evita re-renders cuando cambia currentPage u otros
+// estados del padre que no afectan la estructura del Sidebar.
+export const Sidebar = memo(SidebarComponent);

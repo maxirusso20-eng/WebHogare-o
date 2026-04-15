@@ -34,6 +34,7 @@ import { PantallaLogin } from './components/PantallaLogin';
 import { PantallaRoles } from './components/PantallaRoles';
 import { PantallaChat } from './components/PantallaChat';
 import { PantallaDashboard } from './components/PantallaDashboard';
+import { PantallaRuteador } from './components/PantallaRuteador';
 
 // ────────────────────────────────────────────────────────────────────────
 // CONTEXTO GLOBAL
@@ -157,15 +158,15 @@ function App() {
   }, []);
 
   // ─── FUNCIONES AUXILIARES ─────────────────────────────
-  const mostrarToast = (mensaje, tipo = 'info') => {
+  const mostrarToast = useCallback((mensaje, tipo = 'info') => {
     const id = Date.now();
     setToasts(prev => [...prev, { id, mensaje, tipo }]);
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 3000);
-  };
+  }, []);
 
-  const toggleTheme = () => {
+  const toggleTheme = useCallback(() => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     // Apply synchronously before React re-render for instant visual switch
     document.documentElement.setAttribute('data-theme', newTheme);
@@ -173,9 +174,9 @@ function App() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
     setTheme(newTheme);
     localStorage.setItem('theme', newTheme);
-  };
+  }, [theme]);
 
-  const guardarChofer = async (choferData) => {
+  const guardarChofer = useCallback(async (choferData) => {
     try {
       if (choferData.id) {
         // Actualizar
@@ -201,9 +202,9 @@ function App() {
       console.error('Error:', err);
       mostrarToast('✗ Error al guardar', 'error');
     }
-  };
+  }, [mostrarToast]);
 
-  const eliminarChofer = async (id) => {
+  const eliminarChofer = useCallback(async (id) => {
     if (!window.confirm('¿Eliminar este chofer?')) return;
 
     try {
@@ -219,9 +220,9 @@ function App() {
       console.error('Error:', err);
       mostrarToast('✗ Error al eliminar', 'error');
     }
-  };
+  }, [mostrarToast]);
 
-  const guardarColecta = async (colectaData) => {
+  const guardarColecta = useCallback(async (colectaData) => {
     try {
       if (colectaData.id) {
         const { error } = await supabase
@@ -245,9 +246,9 @@ function App() {
       console.error('Error:', err);
       mostrarToast('✗ Error al guardar', 'error');
     }
-  };
+  }, [mostrarToast]);
 
-  const handleEliminarCliente = async (clienteId) => {
+  const handleEliminarCliente = useCallback(async (clienteId) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
     setLoading(true);
     try {
@@ -266,9 +267,9 @@ function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mostrarToast]);
 
-  const handleEliminarClienteConfirm = async () => {
+  const handleEliminarClienteConfirm = useCallback(async () => {
     if (!itemAEliminar) return;
     setLoading(true);
     try {
@@ -289,17 +290,17 @@ function App() {
       setIsConfirmDeleteOpen(false);
       setItemAEliminar(null);
     }
-  };
+  }, [itemAEliminar, mostrarToast]);
 
-  const handleEliminarClienteCancel = () => {
+  const handleEliminarClienteCancel = useCallback(() => {
     setIsConfirmDeleteOpen(false);
     setItemAEliminar(null);
-  };
+  }, []);
 
-  const handleOpenConfirmDeleteModal = (cliente) => {
+  const handleOpenConfirmDeleteModal = useCallback((cliente) => {
     setItemAEliminar(cliente);
     setIsConfirmDeleteOpen(true);
-  };
+  }, []);
 
   // ─── CONTEXTO GLOBAL ───────────────────────────────────
   const eliminarRecorrido = async (id) => {
@@ -320,7 +321,9 @@ function App() {
   const isSuperAdmin = session?.user?.email === 'maxirusso20@gmail.com';
   const isAdmin = isSuperAdmin || subadmins.some(s => s.email === session?.user?.email);
 
-  const contextValue = {
+  // useMemo: el objeto contextValue solo se recrea cuando algún valor real
+  // cambia — evita que TODOS los consumidores se re-rendericen en c/render de App
+  const contextValue = useMemo(() => ({
     session,
     isAdmin,
     isSuperAdmin,
@@ -347,7 +350,15 @@ function App() {
     handleEliminarClienteConfirm,
     handleEliminarClienteCancel,
     handleOpenConfirmDeleteModal,
-  };
+  }), [
+    session, isAdmin, isSuperAdmin, subadmins,
+    choferes, colectas, clientes, loading,
+    currentPage, theme,
+    toggleTheme, guardarChofer, eliminarChofer, guardarColecta,
+    eliminarRecorrido, mostrarToast, handleEliminarCliente,
+    handleEliminarClienteConfirm, handleEliminarClienteCancel,
+    handleOpenConfirmDeleteModal,
+  ]);
 
   // ─── RENDER ───────────────────────────────────────────
   return (
@@ -475,13 +486,14 @@ function AppShell({ theme, showSplash, currentPage, setCurrentPage, isSidebarMob
           unreadCount={unreadCount}
         />
         <main className="main-content" style={{ position: 'relative' }}>
-          <div key={currentPage} className="animate-fade-slide" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '100%' }}>
+          <div key={currentPage} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: '100%' }}>
             {currentPage === 'dashboard' && <PantallaDashboard />}
             {currentPage === 'recorridos' && <PantallaRecorridos />}
             {currentPage === 'choferes' && <PantallaChoferes />}
             {currentPage === 'clientes' && <PantallaClientes />}
             {currentPage === 'historial' && <PantallaHistorial />}
             {currentPage === 'maps' && <PantallaMaps />}
+            {currentPage === 'ruteador' && <PantallaRuteador />}
             {currentPage === 'chat' && <PantallaChat />}
             {currentPage === 'roles' && <PantallaRoles />}
           </div>

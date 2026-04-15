@@ -13,6 +13,16 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../supabase';
 import { AppContext } from '../App';
 
+// ── Los estilos del mapa (pulseGPS, spin, .icono-camion, etc.) viven
+// ── en index.css — no se inyectan dinámicamente para no crear capas extra.
+
+// ── Límites del AMBA (Área Metropolitana de Buenos Aires) ──────────────
+// Cubre desde Zárate/Campana al norte hasta La Plata al sur,
+// y todo el corredor Oeste hasta Luján. El usuario no puede salir de aquí.
+const AMBA_BOUNDS = [[-35.5, -59.5], [-33.7, -57.5]]; // Cubre Zárate/Campana al norte
+const AMBA_CENTER = [-34.65, -58.65]; // Zona Oeste — centro visual ideal
+const AMBA_MIN_ZOOM = 9;              // Permite ver todo el AMBA + Zárate en una sola vista
+
 // ──────────────────────────────────────────────────────────────────
 // FIX: Leaflet pierde sus íconos default con bundlers (Vite/Webpack)
 // ──────────────────────────────────────────────────────────────────
@@ -345,12 +355,12 @@ export function PantallaMaps() {
     [choferesConGPS] // tick no está acá a propósito: los popups no necesitan actualizarse cada 30s
   );
 
-  const handleClickChofer = (chofer) => {
+  const handleClickChofer = useCallback((chofer) => {
     setChoferSeleccionado(chofer);
     if (chofer.latitud != null && chofer.longitud != null) {
       setFlyTarget({ latitud: chofer.latitud, longitud: chofer.longitud });
     }
-  };
+  }, []);
 
   if (cargando) {
     return (
@@ -554,8 +564,7 @@ export function PantallaMaps() {
           position: 'absolute', top: '16px', left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 1000, pointerEvents: 'none',
-          background: 'rgba(13, 21, 38, 0.9)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(13, 21, 38, 0.98)',
           border: '1px solid rgba(59,130,246,0.3)',
           borderRadius: '16px', padding: '8px 20px',
           display: 'flex', alignItems: 'center', gap: '8px',
@@ -574,8 +583,11 @@ export function PantallaMaps() {
         </div>
 
         <MapContainer
-          center={[-34.6037, -58.3816]}
-          zoom={10}
+          center={AMBA_CENTER}
+          zoom={11}
+          minZoom={AMBA_MIN_ZOOM}
+          maxBounds={AMBA_BOUNDS}
+          maxBoundsViscosity={1.0}
           style={{ width: '100%', height: '100%' }}
           zoomControl={false}
         >
@@ -603,20 +615,7 @@ export function PantallaMaps() {
           <MapResizer panelExpandido={panelExpandido} />
         </MapContainer>
 
-        {/* Badge: sin GPS si hay choferes sin coordenadas */}
-        {choferes.length > choferesConGPS.length && (
-          <div style={{
-            position: 'absolute', bottom: '16px', right: '16px', zIndex: 1000,
-            background: 'rgba(13,21,38,0.9)', backdropFilter: 'blur(8px)',
-            border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: '12px', padding: '8px 14px',
-            fontSize: '12px', color: '#fff',
-            display: 'flex', alignItems: 'center', gap: '6px',
-          }}>
-            <span style={{ color: '#EF4444' }}>●</span>
-            {choferes.length - choferesConGPS.length} chofer{choferes.length - choferesConGPS.length !== 1 ? 'es' : ''} sin GPS activo
-          </div>
-        )}
+        {/* Badge sin GPS eliminado — la info ya se refleja en el panel lateral */}
 
         {/* Estado vacío */}
         {choferesConGPS.length === 0 && !cargando && (
@@ -624,7 +623,7 @@ export function PantallaMaps() {
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
             zIndex: 1000, textAlign: 'center',
-            background: 'rgba(13,21,38,0.95)', backdropFilter: 'blur(12px)',
+            background: 'rgba(13,21,38,0.98)',
             border: '1px solid rgba(59,130,246,0.2)',
             borderRadius: '20px', padding: '32px 40px',
           }}>
@@ -638,42 +637,6 @@ export function PantallaMaps() {
           </div>
         )}
       </div>
-
-      {/* ── ESTILOS ANIMACIONES ── */}
-      <style>{`
-        @keyframes pulseGPS {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.6; transform: scale(1.3); }
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        .icono-camion {
-          background: transparent !important;
-          border: none !important;
-        }
-        .leaflet-popup-content-wrapper {
-          border-radius: 12px !important;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.2) !important;
-        }
-        .leaflet-popup-content {
-          margin: 12px 14px !important;
-        }
-        /* Estilo del cluster — mantiene la paleta oscura del proyecto */
-        .marker-cluster-small,
-        .marker-cluster-medium,
-        .marker-cluster-large {
-          background-color: rgba(59, 130, 246, 0.25) !important;
-        }
-        .marker-cluster-small div,
-        .marker-cluster-medium div,
-        .marker-cluster-large div {
-          background-color: rgba(59, 130, 246, 0.85) !important;
-          color: #fff !important;
-          font-weight: 700 !important;
-          font-size: 13px !important;
-        }
-      `}</style>
     </div>
   );
 }

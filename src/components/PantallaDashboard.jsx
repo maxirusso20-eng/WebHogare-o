@@ -74,7 +74,7 @@ export function PantallaDashboard() {
                 const hace7 = new Date();
                 hace7.setDate(hace7.getDate() - 6);
                 const { data } = await supabase
-                    .from('historial')
+                    .from('historial_recorridos')
                     .select('fecha, entregados, pqte_dia, por_fuera')
                     .gte('fecha', hace7.toISOString().split('T')[0])
                     .order('fecha', { ascending: true });

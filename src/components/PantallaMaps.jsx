@@ -2,7 +2,8 @@
 // ──────────────────────────────────────────────────────────────────
 // Mapa en tiempo real — Rastreo de camiones de la flota
 // Usa: React Leaflet + MarkerClusterGroup + OpenStreetMap + Supabase Realtime
-// Lee: tabla Choferes (columnas: latitud, longitud, ultima_actualizacion)
+// Lee: tabla Choferes (latitud, longitud, ultima_actualizacion)
+//      tabla rutas_activas (direccion, lat, lng, estado, id)
 // ──────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useMemo, useRef, useState, useContext, memo } from 'react';
@@ -17,11 +18,12 @@ import { AppContext } from '../App';
 // ── en index.css — no se inyectan dinámicamente para no crear capas extra.
 
 // ── Límites del AMBA (Área Metropolitana de Buenos Aires) ──────────────
-// Cubre desde Zárate/Campana al norte hasta La Plata al sur,
-// y todo el corredor Oeste hasta Luján. El usuario no puede salir de aquí.
-const AMBA_BOUNDS = [[-35.5, -59.5], [-33.7, -57.5]]; // Cubre Zárate/Campana al norte
-const AMBA_CENTER = [-34.65, -58.65]; // Zona Oeste — centro visual ideal
-const AMBA_MIN_ZOOM = 9;              // Permite ver todo el AMBA + Zárate en una sola vista
+const AMBA_BOUNDS = [[-35.5, -59.5], [-33.7, -57.5]];
+const AMBA_CENTER = [-34.65, -58.65];
+const AMBA_MIN_ZOOM = 9;
+
+// ── ORS API Key — leída desde .env como VITE_ORS_KEY (estándar Vite) ────
+const ORS_API_KEY = import.meta.env.VITE_ORS_KEY;
 
 // ──────────────────────────────────────────────────────────────────
 // FIX: Leaflet pierde sus íconos default con bundlers (Vite/Webpack)
@@ -70,12 +72,46 @@ const crearIconoCamion = (color = '#34D399') => {
 };
 
 // Cache de íconos por estado — evita crear objetos Leaflet en cada render
-// Con 100 choferes, sin esto se crearían 100 objetos nuevos por re-render.
 const ICON_CACHE = {
   activo: crearIconoCamion('#34D399'),
   lento: crearIconoCamion('#F59E0B'),
   offline: crearIconoCamion('#EF4444'),
 };
+
+// ──────────────────────────────────────────────────────────────────
+// ÍCONOS para paradas de rutas_activas
+// ──────────────────────────────────────────────────────────────────
+const crearIconoParada = (entregado = false) => {
+  const color = entregado ? '#22c55e' : '#ef4444';
+  const symbol = entregado
+    ? `<text x="22" y="28" text-anchor="middle" font-size="18" fill="white">✓</text>`
+    : `<circle cx="22" cy="22" r="7" fill="white" opacity="0.9"/>`;
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="44" height="52" viewBox="0 0 44 52">
+      <defs>
+        <filter id="sh" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.4)"/>
+        </filter>
+      </defs>
+      <!-- Pin shape -->
+      <path d="M22 2 C11.5 2 3 10.5 3 21 C3 33 22 50 22 50 C22 50 41 33 41 21 C41 10.5 32.5 2 22 2Z"
+            fill="${color}" filter="url(#sh)"/>
+      <circle cx="22" cy="21" r="12" fill="white" opacity="0.15"/>
+      ${symbol}
+    </svg>`;
+
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [44, 52],
+    iconAnchor: [22, 50],
+    popupAnchor: [0, -50],
+  });
+};
+
+const ICON_PARADA_PENDIENTE = crearIconoParada(false);
+const ICON_PARADA_ENTREGADA = crearIconoParada(true);
 
 // ──────────────────────────────────────────────────────────────────
 // HELPERS
@@ -109,6 +145,40 @@ const LABELS_ESTADO = {
 };
 
 // ──────────────────────────────────────────────────────────────────
+// Geocodificador OpenRouteService — siempre fuerza Buenos Aires, AR
+// ──────────────────────────────────────────────────────────────────
+async function geocodificar(direccion) {
+  // Validar que la API key esté cargada desde .env
+  if (!ORS_API_KEY) {
+    throw new Error('Falta VITE_ORS_KEY en el .env — reiniciá el servidor después de crearlo');
+  }
+
+  const url = `https://api.openrouteservice.org/geocode/search?api_key=${ORS_API_KEY}&text=${encodeURIComponent(direccion + ', Buenos Aires, Argentina')}`;
+
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (netErr) {
+    console.error('[ORS] Error de red:', netErr);
+    throw new Error('Sin conexión o CORS bloqueado — revisá la consola del navegador');
+  }
+
+  if (!res.ok) {
+    const texto = await res.text().catch(() => res.statusText);
+    console.error(`[ORS] HTTP ${res.status}:`, texto);
+    throw new Error(`Error ORS ${res.status}: ${res.status === 403 ? 'API Key inválida o sin cuota' : texto}`);
+  }
+
+  const data = await res.json();
+  if (!data.features || data.features.length === 0) {
+    throw new Error(`Dirección no encontrada: "${direccion}, Buenos Aires, Argentina"`);
+  }
+
+  const [lng, lat] = data.features[0].geometry.coordinates;
+  return { lat, lng, label: data.features[0].properties.label };
+}
+
+// ──────────────────────────────────────────────────────────────────
 // SUBCOMPONENTE: Mueve el mapa cuando el usuario hace clic en un chofer
 // ──────────────────────────────────────────────────────────────────
 function FlyToMarker({ target }) {
@@ -127,10 +197,7 @@ function FlyToMarker({ target }) {
 function MapResizer({ panelExpandido }) {
   const map = useMap();
   useEffect(() => {
-    // Esperamos 250ms a que termine la transición CSS del panel (220ms)
-    const timeout = setTimeout(() => {
-      map.invalidateSize();
-    }, 250);
+    const timeout = setTimeout(() => { map.invalidateSize(); }, 250);
     return () => clearTimeout(timeout);
   }, [map, panelExpandido]);
   return null;
@@ -138,8 +205,6 @@ function MapResizer({ panelExpandido }) {
 
 // ──────────────────────────────────────────────────────────────────
 // SUBCOMPONENTE MEMOIZADO: Ítem de la lista del panel lateral
-// Sin memo → se re-renderiza 100 veces cuando cambia tick o choferSeleccionado
-// Con memo → solo re-renderiza si cambian sus props
 // ──────────────────────────────────────────────────────────────────
 const ChoferItem = memo(({ chofer, esSeleccionado, onClick }) => {
   const estado = getEstado(chofer.latitud, chofer.ultima_actualizacion);
@@ -192,6 +257,8 @@ const ChoferItem = memo(({ chofer, esSeleccionado, onClick }) => {
 export function PantallaMaps() {
   const { theme } = useContext(AppContext);
   const isDark = theme === 'dark';
+
+  // ── Estado choferes
   const [choferes, setChoferes] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -201,14 +268,33 @@ export function PantallaMaps() {
   const [choferSeleccionado, setChoferSeleccionado] = useState(null);
   const [busqueda, setBusqueda] = useState('');
 
-  // Temporizador para re-renderizar los indicadores de tiempo cada 30s
+  // ── Estado rutas_activas
+  const [rutasActivas, setRutasActivas] = useState([]);
+
+  // ── Estado panel admin
+  const [adminExpandido, setAdminExpandido] = useState(true);
+  const [adminDireccion, setAdminDireccion] = useState('');
+  const [adminCargando, setAdminCargando] = useState(false);
+  const [adminError, setAdminError] = useState('');
+  const [adminToast, setAdminToast] = useState('');
+  const [limpiandoMapa, setLimpiandoMapa] = useState(false);
+  const [confirmLimpiar, setConfirmLimpiar] = useState(false);
+
+  // Temporizador para re-renderizar indicadores de tiempo cada 30s
   const [tick, setTick] = useState(0);
   useEffect(() => {
     const int = setInterval(() => setTick(t => t + 1), 30000);
     return () => clearInterval(int);
   }, []);
 
-  // ── Carga inicial ──────────────────────────────────────────────
+  // Toast auto-hide
+  useEffect(() => {
+    if (!adminToast) return;
+    const t = setTimeout(() => setAdminToast(''), 3500);
+    return () => clearTimeout(t);
+  }, [adminToast]);
+
+  // ── Carga choferes ──────────────────────────────────────────────
   const fetchChoferes = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -225,7 +311,21 @@ export function PantallaMaps() {
     }
   }, []);
 
-  // Refresh manual — con feedback visual en el botón
+  // ── Carga rutas_activas ─────────────────────────────────────────
+  const fetchRutasActivas = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('rutas_activas')
+        .select('id, direccion, lat, lng, estado')
+        .order('creado_at', { ascending: true });
+      if (error) throw error;
+      setRutasActivas(data || []);
+    } catch (err) {
+      console.error('Error cargando rutas_activas:', err);
+    }
+  }, []);
+
+  // Refresh manual choferes — con feedback visual
   const handleRefresh = useCallback(async () => {
     if (isRefreshing) return;
     setIsRefreshing(true);
@@ -244,8 +344,7 @@ export function PantallaMaps() {
     }
   }, [isRefreshing]);
 
-  // ── Realtime: actualización incremental ───────────────────────
-  // Actualiza solo el chofer que cambió — no refetchea los 100.
+  // ── Realtime choferes: actualización incremental ───────────────
   const handleRealtimeUpdate = useCallback((payload) => {
     const updated = payload.new;
     setChoferes(prev => {
@@ -256,11 +355,25 @@ export function PantallaMaps() {
     setChoferSeleccionado(prev =>
       prev?.id === updated.id ? { ...prev, ...updated } : prev
     );
-    setLastUpdated(new Date()); // timestamp en cada cambio realtime
+    setLastUpdated(new Date());
+  }, []);
+
+  // ── Realtime rutas_activas ──────────────────────────────────────
+  const handleRutaRealtime = useCallback((payload) => {
+    if (payload.eventType === 'INSERT') {
+      setRutasActivas(prev => [...prev, payload.new]);
+    } else if (payload.eventType === 'UPDATE') {
+      setRutasActivas(prev =>
+        prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r)
+      );
+    } else if (payload.eventType === 'DELETE') {
+      setRutasActivas(prev => prev.filter(r => r.id !== payload.old.id));
+    }
   }, []);
 
   useEffect(() => {
     fetchChoferes();
+    fetchRutasActivas();
 
     const channel = supabase
       .channel('mapa-web-realtime')
@@ -272,10 +385,67 @@ export function PantallaMaps() {
         { event: 'INSERT', schema: 'public', table: 'Choferes' },
         fetchChoferes
       )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'rutas_activas' },
+        handleRutaRealtime
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchChoferes, handleRealtimeUpdate]);
+  }, [fetchChoferes, fetchRutasActivas, handleRealtimeUpdate, handleRutaRealtime]);
+
+  // ── Admin: Agregar dirección al mapa ───────────────────────────
+  const handleAgregarDireccion = useCallback(async () => {
+    const dir = adminDireccion.trim();
+    if (!dir) return;
+    setAdminCargando(true);
+    setAdminError('');
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No estás autenticado');
+
+      const { lat, lng, label } = await geocodificar(dir);
+      const { error } = await supabase.from('rutas_activas').insert({
+        direccion: dir,
+        lat,
+        lng,
+        estado: 'pendiente',
+        chofer_id: user.id
+      });
+      if (error) throw error;
+      setAdminDireccion('');
+      setAdminToast(`📍 Agregado: ${label}`);
+    } catch (err) {
+      setAdminError(err.message || 'No se pudo geocodificar la dirección');
+    } finally {
+      setAdminCargando(false);
+    }
+  }, [adminDireccion]);
+
+  // ── Admin: Limpiar Mapa (DELETE FROM rutas_activas) ────────────
+  const handleLimpiarMapa = useCallback(async () => {
+    if (!confirmLimpiar) {
+      setConfirmLimpiar(true);
+      setTimeout(() => setConfirmLimpiar(false), 4000);
+      return;
+    }
+    setLimpiandoMapa(true);
+    setConfirmLimpiar(false);
+    try {
+      // DELETE con filtro always-true para Supabase RLS (soporta UUIDs)
+      const { error } = await supabase
+        .from('rutas_activas')
+        .delete()
+        .not('id', 'is', null); // elimina todas las filas
+      if (error) throw error;
+      setRutasActivas([]);
+      setAdminToast('🗑️ Mapa del día limpiado');
+    } catch (err) {
+      setAdminError('Error al limpiar: ' + (err.message || ''));
+    } finally {
+      setLimpiandoMapa(false);
+    }
+  }, [confirmLimpiar]);
 
   // ── Datos derivados ────────────────────────────────────────────
   const choferesConGPS = useMemo(() =>
@@ -283,7 +453,6 @@ export function PantallaMaps() {
     [choferes]
   );
 
-  // Búsqueda en panel — filtra sin tocar el array original
   const choferesFiltrados = useMemo(() => {
     if (!busqueda.trim()) return choferes;
     const q = busqueda.toLowerCase();
@@ -300,14 +469,12 @@ export function PantallaMaps() {
     total: choferes.length,
   }), [choferes, tick]);
 
-  // ── Marcadores memorizados ─────────────────────────────────────
-  // Con 100 choferes, sin useMemo se recrearían 100 <Marker> en cada tick
-  // o cada vez que uno solo cambia. Así solo se recalcula si cambia la lista.
+  // ── Marcadores choferes memorizados ───────────────────────────
   const marcadores = useMemo(() =>
     choferesConGPS.map(chofer => {
       const estado = getEstado(chofer.latitud, chofer.ultima_actualizacion);
       const color = COLORES_ESTADO[estado];
-      const icono = ICON_CACHE[estado]; // ícono reutilizado del cache, no recreado
+      const icono = ICON_CACHE[estado];
       const zonaStr = Array.isArray(chofer.zona)
         ? chofer.zona.join(', ')
         : (chofer.zona || '—');
@@ -322,18 +489,11 @@ export function PantallaMaps() {
           }}
         >
           <Popup>
-            <div style={{
-              fontFamily: "'Inter', sans-serif",
-              minWidth: '180px', padding: '4px',
-            }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                marginBottom: '8px',
-              }}>
+            <div style={{ fontFamily: "'Inter', sans-serif", minWidth: '180px', padding: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <div style={{
                   width: '10px', height: '10px', borderRadius: '50%',
-                  background: color, boxShadow: `0 0 6px ${color}`,
-                  flexShrink: 0,
+                  background: color, boxShadow: `0 0 6px ${color}`, flexShrink: 0,
                 }} />
                 <strong style={{ fontSize: '14px' }}>{chofer.nombre}</strong>
               </div>
@@ -352,7 +512,43 @@ export function PantallaMaps() {
       );
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [choferesConGPS] // tick no está acá a propósito: los popups no necesitan actualizarse cada 30s
+    [choferesConGPS]
+  );
+
+  // ── Marcadores rutas_activas ────────────────────────────────────
+  const marcadoresRutas = useMemo(() =>
+    rutasActivas
+      .filter(r => r.lat != null && r.lng != null)
+      .map(ruta => {
+        const entregado = ruta.estado === 'entregado';
+        const icono = entregado ? ICON_PARADA_ENTREGADA : ICON_PARADA_PENDIENTE;
+        return (
+          <Marker
+            key={`ruta-${ruta.id}`}
+            position={[Number(ruta.lat), Number(ruta.lng)]}
+            icon={icono}
+          >
+            <Popup>
+              <div style={{ fontFamily: "'Inter', sans-serif", minWidth: '160px', padding: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '18px' }}>{entregado ? '✅' : '📦'}</span>
+                  <strong style={{ fontSize: '13px' }}>{ruta.direccion}</strong>
+                </div>
+                <div style={{
+                  display: 'inline-block', padding: '2px 8px', borderRadius: '99px',
+                  fontSize: '11px', fontWeight: '700',
+                  background: entregado ? '#22c55e20' : '#ef444420',
+                  color: entregado ? '#16a34a' : '#dc2626',
+                  border: `1px solid ${entregado ? '#22c55e50' : '#ef444450'}`,
+                }}>
+                  {entregado ? 'Entregado ✓' : 'Pendiente'}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        );
+      }),
+    [rutasActivas]
   );
 
   const handleClickChofer = useCallback((chofer) => {
@@ -413,7 +609,7 @@ export function PantallaMaps() {
                 🚛 Flota en vivo
               </h2>
               <p style={{ margin: '2px 0 0', fontSize: '12px', color: 'var(--text-3)' }}>
-                {choferes.length} choferes registrados
+                {choferes.length} choferes · {rutasActivas.length} paradas
               </p>
             </div>
           )}
@@ -459,7 +655,7 @@ export function PantallaMaps() {
           </div>
         )}
 
-        {/* Buscador — aparece solo cuando hay más de 10 choferes */}
+        {/* Buscador */}
         {panelExpandido && choferes.length > 10 && (
           <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>
             <input
@@ -578,9 +774,185 @@ export function PantallaMaps() {
             {stats.activos} camión{stats.activos !== 1 ? 'es' : ''} en ruta
           </span>
           <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)' }}>
-            · Mapa en tiempo real
+            · {rutasActivas.filter(r => r.estado === 'pendiente').length} pendientes · {rutasActivas.filter(r => r.estado === 'entregado').length} entregados
           </span>
         </div>
+
+        {/* ── PANEL ADMIN FLOTANTE ── */}
+        <div style={{
+          position: 'absolute', bottom: '60px', right: '16px',
+          zIndex: 1100,
+          background: isDark ? 'rgba(13, 21, 38, 0.97)' : 'rgba(255, 255, 255, 0.95)',
+          border: `1px solid ${isDark ? 'rgba(59,130,246,0.35)' : 'rgba(203,213,225,0.8)'}`,
+          borderRadius: '16px', padding: adminExpandido ? '14px 16px' : '10px 16px',
+          width: '280px',
+          backdropFilter: 'blur(12px)',
+          boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.45)' : '0 8px 32px rgba(0,0,0,0.08)',
+          transition: 'padding 0.2s ease',
+        }}>
+          {/* Header clicleable */}
+          <button
+            onClick={() => setAdminExpandido(!adminExpandido)}
+            style={{
+              width: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              background: 'transparent', border: 'none', padding: 0,
+              cursor: 'pointer',
+              marginBottom: adminExpandido ? '10px' : '0',
+            }}
+          >
+            <div style={{
+              fontSize: '12px', fontWeight: '700', color: isDark ? '#fff' : '#1e293b',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              letterSpacing: '0.05em', textTransform: 'uppercase',
+            }}>
+              <span>🗺️</span> Control de Paradas
+            </div>
+            <div style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#64748b', fontSize: '10px' }}>
+              {adminExpandido ? '▼' : '▲'}
+            </div>
+          </button>
+
+          {/* Contenido Colapsable */}
+          {adminExpandido && (
+            <>
+              {/* Input dirección */}
+              <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Ej: Rivadavia 1234, Morón"
+                  value={adminDireccion}
+                  onChange={e => { setAdminDireccion(e.target.value); setAdminError(''); }}
+                  onKeyDown={e => e.key === 'Enter' && handleAgregarDireccion()}
+                  disabled={adminCargando}
+                  style={{
+                    flex: 1, padding: '8px 10px', borderRadius: '8px',
+                    background: isDark ? 'rgba(255,255,255,0.08)' : '#f1f5f9',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1'}`,
+                    color: isDark ? '#fff' : '#1e293b', fontSize: '12px', outline: 'none',
+                    transition: 'border-color 0.15s',
+                  }}
+                  onFocus={e => e.target.style.borderColor = '#3b82f6'}
+                  onBlur={e => e.target.style.borderColor = isDark ? 'rgba(255,255,255,0.15)' : '#cbd5e1'}
+                />
+                {/* Botón Agregar */}
+                <button
+                  onClick={handleAgregarDireccion}
+                  disabled={adminCargando || !adminDireccion.trim()}
+                  title="Agregar al mapa"
+                  style={{
+                    padding: '8px 10px', borderRadius: '8px',
+                    background: adminCargando ? '#1d4ed8' : '#3b82f6',
+                    border: 'none', color: '#fff', cursor: adminCargando ? 'not-allowed' : 'pointer',
+                    fontSize: '14px', flexShrink: 0,
+                    opacity: !adminDireccion.trim() && !adminCargando ? 0.5 : 1,
+                    transition: 'background 0.15s, opacity 0.15s',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                >
+                  {adminCargando
+                    ? <span style={{ display: 'inline-block', animation: 'spin 0.7s linear infinite' }}>⏳</span>
+                    : '📍'
+                  }
+                </button>
+              </div>
+
+              {/* Botón Agregar al mapa (label completo) */}
+              <button
+                onClick={handleAgregarDireccion}
+                disabled={adminCargando || !adminDireccion.trim()}
+                style={{
+                  width: '100%', padding: '8px', borderRadius: '8px',
+                  background: adminCargando ? 'rgba(59,130,246,0.5)' : (isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)'),
+                  border: `1px solid ${isDark ? 'rgba(59,130,246,0.4)' : 'rgba(59,130,246,0.25)'}`,
+                  color: isDark ? '#93c5fd' : '#2563eb', fontSize: '12px', fontWeight: '600',
+                  cursor: adminCargando || !adminDireccion.trim() ? 'not-allowed' : 'pointer',
+                  opacity: !adminDireccion.trim() && !adminCargando ? 0.5 : 1,
+                  marginBottom: '8px',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={e => { if (!adminCargando && adminDireccion.trim()) e.currentTarget.style.background = isDark ? 'rgba(59,130,246,0.25)' : 'rgba(59,130,246,0.15)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = adminCargando ? 'rgba(59,130,246,0.5)' : (isDark ? 'rgba(59,130,246,0.15)' : 'rgba(59,130,246,0.1)'); }}
+              >
+                {adminCargando ? 'Geocodificando...' : '+ Agregar al mapa'}
+              </button>
+
+              {/* Error */}
+              {adminError && (
+                <div style={{
+                  fontSize: '11px', color: '#fca5a5', background: 'rgba(239,68,68,0.12)',
+                  border: '1px solid rgba(239,68,68,0.3)', borderRadius: '6px',
+                  padding: '6px 8px', marginBottom: '8px',
+                }}>
+                  ⚠️ {adminError}
+                </div>
+              )}
+
+              {/* Divisor */}
+              <div style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#cbd5e1'}`, margin: '8px 0' }} />
+
+              {/* Contador paradas */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                fontSize: '11px', color: isDark ? 'rgba(255,255,255,0.5)' : '#64748b',
+                marginBottom: '8px',
+              }}>
+                <span>🔴 {rutasActivas.filter(r => r.estado !== 'entregado').length} pendientes</span>
+                <span>🟢 {rutasActivas.filter(r => r.estado === 'entregado').length} entregados</span>
+              </div>
+
+              {/* Botón Limpiar Mapa */}
+              <button
+                onClick={handleLimpiarMapa}
+                disabled={limpiandoMapa || rutasActivas.length === 0}
+                style={{
+                  width: '100%', padding: '8px', borderRadius: '8px',
+                  background: confirmLimpiar
+                    ? 'rgba(239,68,68,0.9)'
+                    : (isDark ? 'rgba(239,68,68,0.12)' : '#fef2f2'),
+                  border: `1px solid ${confirmLimpiar ? '#ef4444' : (isDark ? 'rgba(239,68,68,0.35)' : '#fecaca')}`,
+                  color: confirmLimpiar ? '#fff' : (isDark ? '#fca5a5' : '#991b1b'),
+                  fontSize: '12px', fontWeight: '700',
+                  cursor: limpiandoMapa || rutasActivas.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: rutasActivas.length === 0 ? 0.4 : 1,
+                  transition: 'all 0.2s',
+                  letterSpacing: '0.03em',
+                }}
+                onMouseEnter={e => {
+                  if (!limpiandoMapa && rutasActivas.length > 0 && !confirmLimpiar)
+                    e.currentTarget.style.background = isDark ? 'rgba(239,68,68,0.25)' : '#fee2e2';
+                }}
+                onMouseLeave={e => {
+                  if (!confirmLimpiar) e.currentTarget.style.background = isDark ? 'rgba(239,68,68,0.12)' : '#fef2f2';
+                }}
+              >
+                {limpiandoMapa
+                  ? '🗑️ Limpiando...'
+                  : confirmLimpiar
+                    ? '⚠️ Confirmar — se borra TODO'
+                    : '🗑️ Limpiar Mapa del Día'
+                }
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* ── Toast de éxito ── */}
+        {adminToast && (
+          <div style={{
+            position: 'absolute', bottom: '20px', left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1200,
+            background: 'rgba(34,197,94,0.95)',
+            color: '#fff', fontSize: '13px', fontWeight: '600',
+            padding: '10px 20px', borderRadius: '12px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            animation: 'badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+            whiteSpace: 'nowrap',
+          }}>
+            {adminToast}
+          </div>
+        )}
 
         <MapContainer
           center={AMBA_CENTER}
@@ -599,26 +971,26 @@ export function PantallaMaps() {
             }
           />
 
-          {/* ClusterGroup agrupa pines cercanos al hacer zoom out */}
+          {/* Paradas de rutas_activas — sin cluster para ver pines individuales */}
+          {marcadoresRutas}
+
+          {/* ClusterGroup agrupa camiones cercanos al hacer zoom out */}
           <MarkerClusterGroup
-            chunkedLoading            // carga los 100 markers sin bloquear el hilo
-            maxClusterRadius={60}     // píxeles de radio para agrupar
+            chunkedLoading
+            maxClusterRadius={60}
             showCoverageOnHover={false}
           >
             {marcadores}
           </MarkerClusterGroup>
 
-          {/* Zoom control en la esquina inferior derecha — lejos del sidebar */}
           <ZoomControl position="bottomright" />
 
           {flyTarget && <FlyToMarker target={flyTarget} />}
           <MapResizer panelExpandido={panelExpandido} />
         </MapContainer>
 
-        {/* Badge sin GPS eliminado — la info ya se refleja en el panel lateral */}
-
         {/* Estado vacío */}
-        {choferesConGPS.length === 0 && !cargando && (
+        {choferesConGPS.length === 0 && rutasActivas.length === 0 && !cargando && (
           <div style={{
             position: 'absolute', top: '50%', left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -629,10 +1001,10 @@ export function PantallaMaps() {
           }}>
             <div style={{ fontSize: '48px', marginBottom: '12px' }}>📡</div>
             <h3 style={{ margin: '0 0 8px', color: '#fff', fontSize: '18px' }}>
-              Sin camiones en el mapa
+              Sin camiones ni paradas
             </h3>
             <p style={{ margin: 0, color: '#4A6FA5', fontSize: '13px', maxWidth: '260px' }}>
-              Cuando un chofer abra la app en su celular y comparta su ubicación, aparecerá aquí automáticamente.
+              Usá el panel de control para agregar paradas, o esperá a que un chofer abra la app.
             </p>
           </div>
         )}

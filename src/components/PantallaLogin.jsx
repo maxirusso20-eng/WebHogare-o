@@ -9,8 +9,97 @@ export function PantallaLogin() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [focused, setFocused] = useState(null);
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem('theme') || document.documentElement.getAttribute('data-theme') || 'light'
+  );
   const canvasRef = useRef(null);
   const animRef = useRef(null);
+
+  /* ── Detectar cambios de tema en caliente ── */
+  useEffect(() => {
+    const html = document.documentElement;
+    const observer = new MutationObserver(() => {
+      const nuevo = html.getAttribute('data-theme') || 'light';
+      setTheme(nuevo);
+    });
+    observer.observe(html, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const isDark = theme === 'dark';
+
+  /* ── Paleta según el tema ── */
+  const palette = isDark
+    ? {
+      // OSCURO (diseño original)
+      bgGradient: 'linear-gradient(160deg, #020617 0%, #0c1c3a 55%, #030b19 100%)',
+      cardBg: 'rgba(8,18,38,0.84)',
+      cardBorder: 'rgba(255,255,255,0.06)',
+      cardInset: '0 40px 80px -20px rgba(0,0,0,.85), inset 0 0 0 1px rgba(255,255,255,.04)',
+      inputBg: 'rgba(255,255,255,0.04)',
+      inputBorder: 'rgba(255,255,255,0.08)',
+      inputColor: '#f1f5f9',
+      inputPlaceholder: '#334155',
+      focusBg: 'rgba(59,130,246,0.07)',
+      focusBorder: '#3b82f6',
+      focusShadow: '0 0 0 3px rgba(59,130,246,0.14)',
+      labelColor: '#475569',
+      iconIdle: '#475569',
+      iconActive: '#60a5fa',
+      title: '#f1f5f9',
+      subtitle: '#475569',
+      divider: 'linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)',
+      footer: '#1e293b',
+      errorBg: 'rgba(239,68,68,.09)',
+      errorBorder: 'rgba(239,68,68,.22)',
+      errorColor: '#fca5a5',
+      orb1: 'radial-gradient(circle,rgba(29,78,216,.18) 0%,transparent 65%)',
+      orb2: 'radial-gradient(circle,rgba(109,40,217,.12) 0%,transparent 65%)',
+      routeLine: 'rgba(59,130,246,0.09)',
+      nodeFill: 'rgba(96,165,250,0.4)',
+      nodePulse: (p) => `rgba(59,130,246,${0.05 + p * 0.07})`,
+      truckBody: 'rgba(96,165,250,0.75)',
+      truckWindow: 'rgba(186,230,253,0.9)',
+      truckWheel: 'rgba(15,40,100,0.7)',
+      trailStart: 'rgba(59,130,246,0)',
+      trailEnd: 'rgba(96,165,250,0.35)',
+      particle: (a) => `rgba(148,163,184,${a})`,
+    }
+    : {
+      // CLARO
+      bgGradient: 'linear-gradient(160deg, #eff6ff 0%, #dbeafe 55%, #f1f5f9 100%)',
+      cardBg: 'rgba(255,255,255,0.88)',
+      cardBorder: 'rgba(59,130,246,0.12)',
+      cardInset: '0 30px 60px -15px rgba(30,58,138,.18), inset 0 0 0 1px rgba(255,255,255,.5)',
+      inputBg: 'rgba(255,255,255,0.75)',
+      inputBorder: 'rgba(148,163,184,0.25)',
+      inputColor: '#0f172a',
+      inputPlaceholder: '#94a3b8',
+      focusBg: 'rgba(59,130,246,0.05)',
+      focusBorder: '#3b82f6',
+      focusShadow: '0 0 0 3px rgba(59,130,246,0.14)',
+      labelColor: '#64748b',
+      iconIdle: '#94a3b8',
+      iconActive: '#3b82f6',
+      title: '#0f172a',
+      subtitle: '#64748b',
+      divider: 'linear-gradient(90deg,transparent,rgba(15,23,42,.1),transparent)',
+      footer: '#94a3b8',
+      errorBg: 'rgba(239,68,68,.07)',
+      errorBorder: 'rgba(239,68,68,.2)',
+      errorColor: '#dc2626',
+      orb1: 'radial-gradient(circle,rgba(96,165,250,.22) 0%,transparent 65%)',
+      orb2: 'radial-gradient(circle,rgba(167,139,250,.18) 0%,transparent 65%)',
+      routeLine: 'rgba(59,130,246,0.18)',
+      nodeFill: 'rgba(59,130,246,0.55)',
+      nodePulse: (p) => `rgba(59,130,246,${0.08 + p * 0.12})`,
+      truckBody: 'rgba(37,99,235,0.85)',
+      truckWindow: 'rgba(191,219,254,0.95)',
+      truckWheel: 'rgba(30,41,59,0.85)',
+      trailStart: 'rgba(59,130,246,0)',
+      trailEnd: 'rgba(37,99,235,0.5)',
+      particle: (a) => `rgba(100,116,139,${a * 0.9})`,
+    };
 
   /* ── Canvas: mapa de rutas con camiones animados ── */
   useEffect(() => {
@@ -66,7 +155,7 @@ export function PantallaLogin() {
         ctx.beginPath();
         ctx.moveTo(nodes[a].x, nodes[a].y);
         ctx.lineTo(nodes[b].x, nodes[b].y);
-        ctx.strokeStyle = 'rgba(59,130,246,0.09)';
+        ctx.strokeStyle = palette.routeLine;
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 8]);
         ctx.stroke();
@@ -78,11 +167,11 @@ export function PantallaLogin() {
         const pulse = 0.5 + 0.5 * Math.sin(frame * 0.022 + i * 0.9);
         ctx.beginPath();
         ctx.arc(n.x, n.y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(96,165,250,0.4)';
+        ctx.fillStyle = palette.nodeFill;
         ctx.fill();
         ctx.beginPath();
         ctx.arc(n.x, n.y, 7 + pulse * 4, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(59,130,246,${0.05 + pulse * 0.07})`;
+        ctx.strokeStyle = palette.nodePulse(pulse);
         ctx.lineWidth = 1;
         ctx.stroke();
       });
@@ -103,8 +192,8 @@ export function PantallaLogin() {
         const tailX = na.x + (nb.x - na.x) * tailT;
         const tailY = na.y + (nb.y - na.y) * tailT;
         const grad = ctx.createLinearGradient(tailX, tailY, tx, ty);
-        grad.addColorStop(0, 'rgba(59,130,246,0)');
-        grad.addColorStop(1, 'rgba(96,165,250,0.35)');
+        grad.addColorStop(0, palette.trailStart);
+        grad.addColorStop(1, palette.trailEnd);
         ctx.beginPath();
         ctx.moveTo(tailX, tailY);
         ctx.lineTo(tx, ty);
@@ -116,15 +205,15 @@ export function PantallaLogin() {
         ctx.save();
         ctx.translate(tx, ty);
         ctx.rotate(angle);
-        ctx.fillStyle = 'rgba(96,165,250,0.75)';
+        ctx.fillStyle = palette.truckBody;
         ctx.beginPath();
         ctx.roundRect(-8, -3.5, 13, 7, 2);
         ctx.fill();
-        ctx.fillStyle = 'rgba(186,230,253,0.9)';
+        ctx.fillStyle = palette.truckWindow;
         ctx.beginPath();
         ctx.roundRect(3.5, -3, 5, 6, 1);
         ctx.fill();
-        ctx.fillStyle = 'rgba(15,40,100,0.7)';
+        ctx.fillStyle = palette.truckWheel;
         [-3.5, 3.5].forEach(wx => {
           ctx.beginPath();
           ctx.arc(wx, 3.8, 1.6, 0, Math.PI * 2);
@@ -142,7 +231,7 @@ export function PantallaLogin() {
         if (p.y > canvas.height) p.y = 0;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(148,163,184,${p.alpha})`;
+        ctx.fillStyle = palette.particle(p.alpha);
         ctx.fill();
       });
 
@@ -155,7 +244,8 @@ export function PantallaLogin() {
       cancelAnimationFrame(animRef.current);
       window.removeEventListener('resize', resize);
     };
-  }, []);
+    // redibuja el canvas cuando cambia el tema
+  }, [theme]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -179,8 +269,9 @@ export function PantallaLogin() {
     <div style={{
       minHeight: '100vh',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'linear-gradient(160deg, #020617 0%, #0c1c3a 55%, #030b19 100%)',
+      background: palette.bgGradient,
       padding: '24px', position: 'relative', overflow: 'hidden',
+      transition: 'background 0.4s ease',
     }}>
       <style>{`
         @keyframes lgCardIn {
@@ -221,20 +312,20 @@ export function PantallaLogin() {
           width: 100%;
           padding: 14px 16px 14px 48px;
           box-sizing: border-box;
-          background: rgba(255,255,255,0.04);
-          border: 1.5px solid rgba(255,255,255,0.08);
+          background: ${palette.inputBg};
+          border: 1.5px solid ${palette.inputBorder};
           border-radius: 14px;
-          color: #f1f5f9;
+          color: ${palette.inputColor};
           font-size: 16px;
           outline: none;
           font-family: inherit;
-          transition: border-color .2s, background .2s, box-shadow .2s;
+          transition: border-color .2s, background .2s, box-shadow .2s, color .2s;
         }
-        .lg-input::placeholder { color: #334155; }
+        .lg-input::placeholder { color: ${palette.inputPlaceholder}; }
         .lg-input:focus {
-          border-color: #3b82f6;
-          background: rgba(59,130,246,0.07);
-          box-shadow: 0 0 0 3px rgba(59,130,246,0.14);
+          border-color: ${palette.focusBorder};
+          background: ${palette.focusBg};
+          box-shadow: ${palette.focusShadow};
         }
         .lg-input.err { border-color: rgba(239,68,68,0.45); }
 
@@ -276,7 +367,8 @@ export function PantallaLogin() {
           display: block;
           font-size: 12px; font-weight: 700;
           letter-spacing: .9px; text-transform: uppercase;
-          color: #475569; margin-bottom: 8px;
+          color: ${palette.labelColor}; margin-bottom: 8px;
+          transition: color .3s;
         }
         .lg-icon-wrap { position: relative; }
         .lg-icon {
@@ -299,20 +391,21 @@ export function PantallaLogin() {
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
 
       {/* Orbes */}
-      <div style={{ position: 'absolute', top: '-8%', left: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle,rgba(29,78,216,.18) 0%,transparent 65%)', borderRadius: '50%', animation: 'lgOrbFloat1 9s ease-in-out infinite', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: '-12%', right: '-6%', width: '700px', height: '700px', background: 'radial-gradient(circle,rgba(109,40,217,.12) 0%,transparent 65%)', borderRadius: '50%', animation: 'lgOrbFloat2 13s ease-in-out infinite', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', top: '-8%', left: '-10%', width: '600px', height: '600px', background: palette.orb1, borderRadius: '50%', animation: 'lgOrbFloat1 9s ease-in-out infinite', pointerEvents: 'none' }} />
+      <div style={{ position: 'absolute', bottom: '-12%', right: '-6%', width: '700px', height: '700px', background: palette.orb2, borderRadius: '50%', animation: 'lgOrbFloat2 13s ease-in-out infinite', pointerEvents: 'none' }} />
 
       {/* Card */}
       <div className="lg-card" style={{
         width: '100%', maxWidth: '480px', position: 'relative', zIndex: 10,
-        background: 'rgba(8,18,38,0.84)',
+        background: palette.cardBg,
         backdropFilter: 'blur(32px) saturate(160%)',
         WebkitBackdropFilter: 'blur(32px) saturate(160%)',
-        border: '1px solid rgba(255,255,255,0.06)',
+        border: `1px solid ${palette.cardBorder}`,
         borderRadius: '24px',
         padding: '52px 48px 44px',
-        boxShadow: '0 40px 80px -20px rgba(0,0,0,.85), inset 0 0 0 1px rgba(255,255,255,.04)',
+        boxShadow: palette.cardInset,
         overflow: 'hidden',
+        transition: 'background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease',
       }}>
         {/* Borde top brillante */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '2px', background: 'linear-gradient(90deg,transparent,rgba(59,130,246,.65),rgba(139,92,246,.45),transparent)', pointerEvents: 'none' }} />
@@ -368,21 +461,21 @@ export function PantallaLogin() {
               <rect x="38" y="21" width="4" height="3" rx="1" fill="rgba(255,255,255,0.6)" />
             </svg>
           </div>
-          <h1 style={{ margin: '0 0 6px', fontSize: '26px', fontWeight: '800', color: '#f1f5f9', letterSpacing: '-.8px' }}>
+          <h1 style={{ margin: '0 0 6px', fontSize: '26px', fontWeight: '800', color: palette.title, letterSpacing: '-.8px', transition: 'color 0.3s' }}>
             Logística Hogareño
           </h1>
-          <p style={{ margin: 0, color: '#475569', fontSize: '13px', fontWeight: '500', letterSpacing: '.5px' }}>
+          <p style={{ margin: 0, color: palette.subtitle, fontSize: '13px', fontWeight: '500', letterSpacing: '.5px', transition: 'color 0.3s' }}>
             Sistema de gestión de flota
           </p>
         </div>
 
         {/* Divisor */}
-        <div style={{ height: '1px', background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent)', margin: '0 0 24px' }} />
+        <div style={{ height: '1px', background: palette.divider, margin: '0 0 24px' }} />
 
         {/* Form */}
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
           {errorMsg && (
-            <div style={{ padding: '11px 14px', borderRadius: '10px', background: 'rgba(239,68,68,.09)', border: '1px solid rgba(239,68,68,.22)', color: '#fca5a5', fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.45, animation: 'lgFieldIn .3s ease both' }}>
+            <div style={{ padding: '11px 14px', borderRadius: '10px', background: palette.errorBg, border: `1px solid ${palette.errorBorder}`, color: palette.errorColor, fontSize: '13px', fontWeight: '500', display: 'flex', alignItems: 'flex-start', gap: '8px', lineHeight: 1.45, animation: 'lgFieldIn .3s ease both' }}>
               <span style={{ flexShrink: 0 }}>⚠️</span>{errorMsg}
             </div>
           )}
@@ -390,7 +483,7 @@ export function PantallaLogin() {
           <div className="lg-f1">
             <label className="lg-label">Correo electrónico</label>
             <div className="lg-icon-wrap">
-              <Mail size={16} className="lg-icon" color={focused === 'email' ? '#60a5fa' : '#475569'} />
+              <Mail size={16} className="lg-icon" color={focused === 'email' ? palette.iconActive : palette.iconIdle} />
               <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@ejemplo.com" className={`lg-input${errorMsg ? ' err' : ''}`} onFocus={() => setFocused('email')} onBlur={() => setFocused(null)} />
             </div>
           </div>
@@ -398,7 +491,7 @@ export function PantallaLogin() {
           <div className="lg-f2">
             <label className="lg-label">Contraseña</label>
             <div className="lg-icon-wrap">
-              <Lock size={16} className="lg-icon" color={focused === 'password' ? '#60a5fa' : '#475569'} />
+              <Lock size={16} className="lg-icon" color={focused === 'password' ? palette.iconActive : palette.iconIdle} />
               <input type="password" required value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className={`lg-input${errorMsg ? ' err' : ''}`} style={{ letterSpacing: '3px' }} onFocus={() => setFocused('password')} onBlur={() => setFocused(null)} />
             </div>
           </div>
@@ -410,7 +503,7 @@ export function PantallaLogin() {
           </div>
         </form>
 
-        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '11px', color: '#1e293b', letterSpacing: '.3px' }}>
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '11px', color: palette.footer, letterSpacing: '.3px', transition: 'color 0.3s' }}>
           Acceso restringido · Personal autorizado
         </p>
       </div>

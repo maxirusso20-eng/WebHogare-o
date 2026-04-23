@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, MessageCircle, LogOut } from 'lucide-react';
 import '../styles/sidebar.css';
-import { useAuth } from '../AuthContext';
+import { useAuth } from './AuthContext';
 import { supabase } from '../supabase';
 
 export function Sidebar({

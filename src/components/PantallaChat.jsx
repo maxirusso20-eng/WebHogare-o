@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { Send, MessageCircle } from 'lucide-react';
 import { supabase } from '../supabase';
 import { AppContext } from '../App';
-import { useAuth } from '../AuthContext';
+import { useAuth } from './AuthContext';
 
 // Los destinatarios fijos con los que puede chatear el viewer
 const CONTACTOS = [

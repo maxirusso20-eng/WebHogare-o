@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, MessageCircle, LogOut } from 'lucide-react';
+import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, MessageCircle, LogOut, ShieldCheck } from 'lucide-react';
 import '../styles/sidebar.css';
 import { useAuth } from './AuthContext';
 import { supabase } from '../supabase';
@@ -44,6 +44,7 @@ export function Sidebar({
     { id: 'recorridos', label: 'Recorridos', icon: Route, adminOnly: false },
     { id: 'maps', label: 'Maps', icon: Globe, adminOnly: false },
     { id: 'chat', label: 'Chat', icon: MessageCircle, adminOnly: false },
+    { id: 'roles', label: 'Roles', icon: ShieldCheck, adminOnly: true },
   ];
 
   const navItems = allNavItems.filter(item => isAdmin || !item.adminOnly);

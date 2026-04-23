@@ -31,6 +31,7 @@ import { useAuth } from './components/AuthContext';
 import { PantallaLogin } from './components/PantallaLogin';
 import { PantallaChat } from './components/PantallaChat';
 import { PantallaMaps } from './components/PantallaMaps';
+import { PantallaRoles } from './components/PantallaRoles';
 
 // ────────────────────────────────────────────────────────────────────────
 // CONTEXTO GLOBAL
@@ -44,11 +45,15 @@ function App() {
   const [choferes, setChoferes] = useState([]);
   const [colectas, setColectas] = useState([]);
   const [clientes, setClientes] = useState([]);
+  const [subadmins, setSubadmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [toasts, setToasts] = useState([]);
   const [isSidebarMobileOpen, setIsSidebarMobileOpen] = useState(false);
+
+  const SUPER_ADMIN = 'maxirusso20@gmail.com';
+  const isSuperAdmin = session?.user?.email?.toLowerCase() === SUPER_ADMIN;
 
   // ─── APLICAR TEMA AL CARGAR ────────────────────────────
   useEffect(() => {
@@ -291,6 +296,9 @@ function App() {
     setColectas,
     clientes,
     setClientes,
+    subadmins,
+    setSubadmins,
+    isSuperAdmin,
     loading,
     currentPage,
     setCurrentPage,
@@ -346,6 +354,7 @@ function App() {
             {currentPage === 'clientes' && role === 'admin' && <PantallaClientes />}
             {currentPage === 'maps' && <PantallaMaps />}
             {currentPage === 'chat' && <PantallaChat />}
+            {currentPage === 'roles' && role === 'admin' && <PantallaRoles />}
           </main>
         </div>
 

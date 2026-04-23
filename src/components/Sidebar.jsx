@@ -36,7 +36,7 @@ export function Sidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Items según rol: admin ve todo, viewer solo su subconjunto
+  // Admin/subadmin → todo. Viewer → solo Dashboard, Recorridos, Maps, Chat
   const allNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
     { id: 'clientes', label: 'Clientes', icon: UsersRound, adminOnly: true },
@@ -53,11 +53,12 @@ export function Sidebar({
       ? 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))'
       : 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
 
-  // En móviles, mostrar como overlay
+  const handleLogout = () => supabase.auth.signOut();
+
+  // ── MÓVIL ──────────────────────────────────────────────────────────────────
   if (isMobile) {
     return (
       <>
-        {/* Overlay oscuro cuando está abierto */}
         {isMobileOpen && (
           <div
             className="sidebar-overlay-backdrop"
@@ -65,9 +66,7 @@ export function Sidebar({
           />
         )}
 
-        {/* Sidebar como overlay */}
         <nav className={`sidebar sidebar-mobile ${isMobileOpen ? 'mobile-open' : 'mobile-closed'} theme-${theme}`}>
-          {/* HEADER DEL SIDEBAR MÓVIL */}
           <div className="sidebar-header-mobile">
             <div className="sidebar-brand-mobile">
               <span className="brand-icon-mobile">📦</span>
@@ -82,7 +81,6 @@ export function Sidebar({
             </button>
           </div>
 
-          {/* NAVEGACIÓN MÓVIL */}
           <div className="nav-links">
             {navItems.map((item) => {
               const NavIcon = item.icon;
@@ -96,22 +94,16 @@ export function Sidebar({
                   }}
                   title={item.label}
                 >
-                  <span
-                    className="nav-icon inline-flex items-center justify-center"
-                    style={{ filter: iconVolumeShadow }}
-                  >
+                  <span className="nav-icon inline-flex items-center justify-center" style={{ filter: iconVolumeShadow }}>
                     {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
                   </span>
                   <span className="nav-label">{item.label}</span>
-                  {currentPage === item.id && (
-                    <span className="nav-indicator"></span>
-                  )}
+                  {currentPage === item.id && <span className="nav-indicator"></span>}
                 </button>
               );
             })}
           </div>
 
-          {/* FOOTER MÓVIL */}
           <div className="sidebar-footer">
             <div className="theme-switcher-mobile">
               <button
@@ -126,10 +118,12 @@ export function Sidebar({
               </span>
             </div>
             <button
-              onClick={() => supabase.auth.signOut()}
-              className="theme-btn-mobile"
-              style={{ marginTop: '8px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}
-              title="Cerrar sesión"
+              onClick={handleLogout}
+              style={{
+                marginTop: '8px', display: 'flex', alignItems: 'center', gap: '8px',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#ef4444', fontSize: '13px', fontWeight: '600', padding: '6px 0',
+              }}
             >
               <LogOut size={18} />
               <span>Cerrar sesión</span>
@@ -140,10 +134,9 @@ export function Sidebar({
     );
   }
 
-  // VERSIÓN DESKTOP
+  // ── DESKTOP ────────────────────────────────────────────────────────────────
   return (
     <nav className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'} theme-${theme}`}>
-      {/* HEADER DEL SIDEBAR DESKTOP - Abierto/Cerrado */}
       <div className={`sidebar-toggle ${!isCollapsed ? 'sidebar-header-open' : ''}`}>
         {!isCollapsed && (
           <div className="sidebar-brand-text">
@@ -161,7 +154,6 @@ export function Sidebar({
         </button>
       </div>
 
-      {/* NAVEGACIÓN */}
       <div className="nav-links">
         {navItems.map((item) => {
           const NavIcon = item.icon;
@@ -172,22 +164,16 @@ export function Sidebar({
               onClick={() => setCurrentPage(item.id)}
               title={item.label}
             >
-              <span
-                className="nav-icon inline-flex items-center justify-center"
-                style={{ filter: iconVolumeShadow }}
-              >
+              <span className="nav-icon inline-flex items-center justify-center" style={{ filter: iconVolumeShadow }}>
                 {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
               </span>
               {!isCollapsed && <span className="nav-label">{item.label}</span>}
-              {!isCollapsed && currentPage === item.id && (
-                <span className="nav-indicator"></span>
-              )}
+              {!isCollapsed && currentPage === item.id && <span className="nav-indicator"></span>}
             </button>
           );
         })}
       </div>
 
-      {/* FOOTER DEL SIDEBAR DESKTOP */}
       <div className="sidebar-footer">
         <div className={`theme-switcher ${isCollapsed ? 'theme-collapsed' : 'theme-expanded'}`}>
           {isCollapsed ? (
@@ -201,23 +187,13 @@ export function Sidebar({
             </button>
           ) : (
             <>
-              <button
-                className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
-                onClick={toggleTheme}
-                title="Modo claro"
-                aria-label="Light mode"
-              >
+              <button className={`theme-btn ${theme === 'light' ? 'active' : ''}`} onClick={toggleTheme} title="Modo claro">
                 <Sun size={20} />
               </button>
               <div className="theme-toggle-track">
                 <div className={`toggle-circle theme-${theme}`}></div>
               </div>
-              <button
-                className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
-                onClick={toggleTheme}
-                title="Modo oscuro"
-                aria-label="Dark mode"
-              >
+              <button className={`theme-btn ${theme === 'dark' ? 'active' : ''}`} onClick={toggleTheme} title="Modo oscuro">
                 <Moon size={20} />
               </button>
             </>
@@ -229,7 +205,7 @@ export function Sidebar({
 
         {/* CERRAR SESIÓN */}
         <button
-          onClick={() => supabase.auth.signOut()}
+          onClick={handleLogout}
           title="Cerrar sesión"
           style={{
             marginTop: '8px',

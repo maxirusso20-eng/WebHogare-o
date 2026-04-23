@@ -1,14 +1,17 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 
-// ── Emails con acceso ADMIN completo ────────────────────────────────────────
-// Agregá acá los emails que tienen acceso total (ven todo, editan todo).
-// Cualquier otro email autenticado tendrá rol 'viewer':
-//   Ve: Dashboard, Recorridos (puede editar números), Maps, Chat
-//   No ve: Choferes ni Clientes
+// ═══════════════════════════════════════════════════════════════
+// EMAILS CON ACCESO ADMIN (ven TODO el menú)
+// Agregá acá los emails de admins y subadmins.
+// Cualquier otro mail autenticado es "viewer":
+//   → ve: Dashboard, Recorridos, Maps, Chat
+//   → NO ve: Choferes, Clientes
+// ═══════════════════════════════════════════════════════════════
 export const ADMIN_EMAILS = [
-  // 'federicohogareño@gmail.com',
-  // 'maximiliano@empresa.com',
+  // 'maxirusso20@gmail.com',
+  // 'fedeavila@gmail.com',
+  // 'lucas.figueredo092@gmail.com',
 ];
 
 export const AuthContext = createContext(null);

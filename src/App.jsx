@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, createContext, useRef, useCo
 import { supabase } from './supabase';
 import './index.css';
 import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle } from 'lucide-react';
-import { DashboardSabados } from './components/DashboardSabados';
+import { DashboardSabados } from './DashboardSabados';
 import {
   DndContext,
   closestCenter,
@@ -37,7 +37,6 @@ import { PantallaChat } from './components/PantallaChat';
 export const AppContext = createContext();
 
 function App() {
-  // ─── AUTH ─────────────────────────────────────────────────
   const { session, role, loading: authLoading } = useAuth();
 
   // ─── ESTADO ───────────────────────────────────────────────
@@ -308,7 +307,6 @@ function App() {
   };
 
   // ─── RENDER ───────────────────────────────────────────
-  // Mientras Supabase resuelve la sesión
   if (authLoading || loading) {
     return (
       <div className="splash-screen">
@@ -318,7 +316,6 @@ function App() {
     );
   }
 
-  // Sin sesión → pantalla de login
   if (!session) {
     return <PantallaLogin theme={theme} />;
   }
@@ -346,8 +343,8 @@ function App() {
           <main className="main-content">
             {currentPage === 'dashboard' && <PantallaDashboard />}
             {currentPage === 'recorridos' && <PantallaRecorridos />}
-            {currentPage === 'choferes' && <PantallaChoferes />}
-            {currentPage === 'clientes' && <PantallaClientes />}
+            {currentPage === 'choferes' && role === 'admin' && <PantallaChoferes />}
+            {currentPage === 'clientes' && role === 'admin' && <PantallaClientes />}
             {currentPage === 'maps' && <PantallaMaps />}
             {currentPage === 'chat' && <PantallaChat />}
           </main>

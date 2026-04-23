@@ -1077,6 +1077,21 @@ function PantallaRecorridos() {
                               Entregados
                             </div>
                           </th>
+                          <th style={{
+                            padding: '12px 16px',
+                            textAlign: 'center',
+                            color: '#cbd5e1',
+                            fontWeight: '600',
+                            fontSize: '12px',
+                            letterSpacing: '0.5px',
+                            textTransform: 'uppercase',
+                            width: '70px',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', justifyContent: 'center' }}>
+                              <TrendingUp size={14} color={zoneColor} />
+                              %
+                            </div>
+                          </th>
                           <th style={{ padding: '12px 8px', width: '36px' }}></th>
                         </tr>
                       </thead>
@@ -1987,6 +2002,25 @@ function SortableFilaLocalidad({
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
         />
+      </td>
+
+      {/* PORCENTAJE */}
+      <td style={{ padding: '12px 16px', textAlign: 'center', width: '70px' }}>
+        <span style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '4px 10px',
+          borderRadius: '20px',
+          fontSize: '12px',
+          fontWeight: '700',
+          backgroundColor: `${getPercentageColor(porcentajeStr)}20`,
+          color: getPercentageColor(porcentajeStr),
+          border: `1px solid ${getPercentageColor(porcentajeStr)}40`,
+          minWidth: '52px',
+        }}>
+          {porcentajeStr}
+        </span>
       </td>
 
       {/* ELIMINAR */}

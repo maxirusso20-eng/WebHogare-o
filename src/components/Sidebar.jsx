@@ -1,86 +1,57 @@
-import { useState, useEffect, useMemo, memo } from 'react';
-import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, CalendarDays, BookOpen, MessageSquare, LogOut, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, MessageCircle, LogOut } from 'lucide-react';
 import '../styles/sidebar.css';
+import { useAuth } from '../AuthContext';
 import { supabase } from '../supabase';
 
-// ── Los keyframes (badgePop, badgePulse, livePulse) están definidos
-// ── en sidebar.css — no se inyectan dinámicamente.
-
-// Constantes fuera del componente — no se recalculan en cada render
-const SHADOW_DARK = 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
-const SHADOW_LIGHT = 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))';
-
-function SidebarComponent({
+export function Sidebar({
   currentPage,
   setCurrentPage,
   theme,
   toggleTheme,
   isMobileOpen,
-  setIsMobileOpen,
-  isAdmin,
-  isSuperAdmin,
-  unreadCount = 0,
+  setIsMobileOpen
 }) {
+  const { role } = useAuth();
+  const isAdmin = role === 'admin';
+
   const [isCollapsed, setIsCollapsed] = useState(() => {
-    // Cargar estado del sidebar desde localStorage
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved ? JSON.parse(saved) : false;
   });
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768);
 
-  // Guardar estado en localStorage cuando cambia
   useEffect(() => {
     localStorage.setItem('sidebar-collapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
 
-  // Detectar cambios de tamaño de pantalla
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (!mobile) {
-        setIsMobileOpen(false);
-      }
+      if (!mobile) setIsMobileOpen(false);
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ESC: cerrar/minimizar el sidebar cuando está abierto
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key !== 'Escape') return;
-      if (isMobile && isMobileOpen) {
-        setIsMobileOpen(false);
-      } else if (!isMobile && !isCollapsed) {
-        setIsCollapsed(true);
-      }
-    };
+  // Items según rol: admin ve todo, viewer solo su subconjunto
+  const allNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+    { id: 'clientes', label: 'Clientes', icon: UsersRound, adminOnly: true },
+    { id: 'choferes', label: 'Choferes', icon: CarFront, adminOnly: true },
+    { id: 'recorridos', label: 'Recorridos', icon: Route, adminOnly: false },
+    { id: 'maps', label: 'Maps', icon: Globe, adminOnly: false },
+    { id: 'chat', label: 'Chat', icon: MessageCircle, adminOnly: false },
+  ];
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isMobile, isMobileOpen, isCollapsed]);
+  const navItems = allNavItems.filter(item => isAdmin || !item.adminOnly);
 
-  // navItems: solo se recalcula si cambia isAdmin o isSuperAdmin (raramente)
-  const navItems = useMemo(() => {
-    const items = [
-      { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, alwaysVisible: true },
-      { id: 'clientes', label: 'Clientes', icon: UsersRound, alwaysVisible: false },
-      { id: 'choferes', label: 'Choferes', icon: CarFront, alwaysVisible: false },
-      { id: 'recorridos', label: 'Recorridos', icon: Route, alwaysVisible: true },
-      { id: 'historial', label: 'Historial', icon: BookOpen, alwaysVisible: false },
-      { id: 'maps',     label: 'Maps',    icon: Globe,        alwaysVisible: true  },
-      { id: 'chat',     label: 'Chat',    icon: MessageSquare, alwaysVisible: true  },
-    ];
-    if (isSuperAdmin) {
-      items.push({ id: 'roles', label: 'Roles', icon: ShieldCheck, alwaysVisible: false });
-    }
-    return isAdmin ? items : items.filter(item => item.alwaysVisible);
-  }, [isAdmin, isSuperAdmin]);
-
-  const iconVolumeShadow = theme === 'light' ? SHADOW_LIGHT : SHADOW_DARK;
+  const iconVolumeShadow =
+    theme === 'light'
+      ? 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))'
+      : 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
 
   // En móviles, mostrar como overlay
   if (isMobile) {
@@ -115,11 +86,10 @@ function SidebarComponent({
           <div className="nav-links">
             {navItems.map((item) => {
               const NavIcon = item.icon;
-              const showBadge = item.id === 'chat' && unreadCount > 0;
               return (
                 <button
                   key={item.id}
-                  className={`nav-link ${currentPage === item.id ? 'active' : ''}`}
+                  className={`nav-link transition-all duration-200 hover:scale-105 ${currentPage === item.id ? 'active' : ''}`}
                   onClick={() => {
                     setCurrentPage(item.id);
                     setIsMobileOpen(false);
@@ -128,22 +98,9 @@ function SidebarComponent({
                 >
                   <span
                     className="nav-icon inline-flex items-center justify-center"
-                    style={{ filter: iconVolumeShadow, position: 'relative' }}
+                    style={{ filter: iconVolumeShadow }}
                   >
                     {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
-                    {showBadge && (
-                      <span style={{
-                        position: 'absolute', top: '-5px', right: '-6px',
-                        background: '#ef4444', color: '#fff',
-                        fontSize: '10px', fontWeight: '800',
-                        borderRadius: '10px', padding: '1px 5px',
-                        minWidth: '16px', textAlign: 'center', lineHeight: '14px',
-                        border: `2px solid ${theme === 'light' ? '#fff' : '#0f172a'}`,
-                        animation: 'badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-                      }}>
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
                   </span>
                   <span className="nav-label">{item.label}</span>
                   {currentPage === item.id && (
@@ -168,17 +125,14 @@ function SidebarComponent({
                 {theme === 'light' ? 'Claro' : 'Oscuro'}
               </span>
             </div>
-
             <button
               onClick={() => supabase.auth.signOut()}
-              style={{
-                marginTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-                width: '100%', padding: '12px', background: 'transparent', border: `1px solid ${theme === 'light' ? '#ef444450' : '#ef444450'}`,
-                color: '#ef4444', borderRadius: '12px', fontWeight: '600', cursor: 'pointer',
-              }}
+              className="theme-btn-mobile"
+              style={{ marginTop: '8px', color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '600', background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0' }}
+              title="Cerrar sesión"
             >
               <LogOut size={18} />
-              Cerrar sesión
+              <span>Cerrar sesión</span>
             </button>
           </div>
         </nav>
@@ -188,23 +142,22 @@ function SidebarComponent({
 
   // VERSIÓN DESKTOP
   return (
-    <nav
-      className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'} theme-${theme}`}
-    >
-      {/* HEADER DEL SIDEBAR DESKTOP */}
-      <div className="sidebar-toggle sidebar-header-open">
-        <div className="sidebar-brand-text">
-          <span className="brand-icon-desk">📦</span>
-          <h2 className="brand-text-desk">Hogareño</h2>
-        </div>
+    <nav className={`sidebar ${isCollapsed ? 'collapsed' : 'expanded'} theme-${theme}`}>
+      {/* HEADER DEL SIDEBAR DESKTOP - Abierto/Cerrado */}
+      <div className={`sidebar-toggle ${!isCollapsed ? 'sidebar-header-open' : ''}`}>
+        {!isCollapsed && (
+          <div className="sidebar-brand-text">
+            <span className="brand-icon-desk">📦</span>
+            <h2 className="brand-text-desk">Hogareño</h2>
+          </div>
+        )}
         <button
           className="hamburger-btn"
           onClick={() => setIsCollapsed(!isCollapsed)}
           aria-label="Toggle sidebar"
           title={isCollapsed ? 'Abrir menú' : 'Cerrar menú'}
         >
-          <span className="icon-menu"><Menu size={24} /></span>
-          <span className="icon-close"><X size={24} /></span>
+          {isCollapsed ? <Menu size={24} /> : <X size={24} />}
         </button>
       </div>
 
@@ -212,35 +165,23 @@ function SidebarComponent({
       <div className="nav-links">
         {navItems.map((item) => {
           const NavIcon = item.icon;
-          const showBadge = item.id === 'chat' && unreadCount > 0;
           return (
             <button
               key={item.id}
-              className={`nav-link ${currentPage === item.id ? 'active' : ''}`}
+              className={`nav-link transition-all duration-200 hover:scale-105 ${currentPage === item.id ? 'active' : ''}`}
               onClick={() => setCurrentPage(item.id)}
               title={item.label}
             >
               <span
                 className="nav-icon inline-flex items-center justify-center"
-                style={{ filter: iconVolumeShadow, position: 'relative' }}
+                style={{ filter: iconVolumeShadow }}
               >
                 {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
-                {showBadge && (
-                  <span style={{
-                    position: 'absolute', top: '-5px', right: '-7px',
-                    background: '#ef4444', color: '#fff',
-                    fontSize: '10px', fontWeight: '800',
-                    borderRadius: '10px', padding: '1px 5px',
-                    minWidth: '16px', textAlign: 'center', lineHeight: '14px',
-                    border: `2px solid ${theme === 'light' ? '#fff' : '#0f172a'}`,
-                    animation: 'badgePop 0.3s cubic-bezier(0.34,1.56,0.64,1), badgePulse 2s 0.3s ease-in-out infinite',
-                  }}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
               </span>
-              <span className="nav-label">{item.label}</span>
-              <span className="nav-indicator"></span>
+              {!isCollapsed && <span className="nav-label">{item.label}</span>}
+              {!isCollapsed && currentPage === item.id && (
+                <span className="nav-indicator"></span>
+              )}
             </button>
           );
         })}
@@ -248,42 +189,72 @@ function SidebarComponent({
 
       {/* FOOTER DEL SIDEBAR DESKTOP */}
       <div className="sidebar-footer">
-        <div className="theme-switcher theme-expanded">
-          <button
-            className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
-            onClick={toggleTheme}
-            title="Modo claro"
-            aria-label="Light mode"
-          >
-            <Sun size={20} />
-          </button>
-          <div className="theme-toggle-track">
-            <div className={`toggle-circle theme-${theme}`}></div>
-          </div>
-          <button
-            className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
-            onClick={toggleTheme}
-            title="Modo oscuro"
-            aria-label="Dark mode"
-          >
-            <Moon size={20} />
-          </button>
+        <div className={`theme-switcher ${isCollapsed ? 'theme-collapsed' : 'theme-expanded'}`}>
+          {isCollapsed ? (
+            <button
+              className="theme-icon-only"
+              onClick={toggleTheme}
+              title={`Cambiar a ${theme === 'light' ? 'Oscuro' : 'Claro'}`}
+              aria-label="Toggle theme"
+            >
+              {theme === 'light' ? <Sun size={24} /> : <Moon size={24} />}
+            </button>
+          ) : (
+            <>
+              <button
+                className={`theme-btn ${theme === 'light' ? 'active' : ''}`}
+                onClick={toggleTheme}
+                title="Modo claro"
+                aria-label="Light mode"
+              >
+                <Sun size={20} />
+              </button>
+              <div className="theme-toggle-track">
+                <div className={`toggle-circle theme-${theme}`}></div>
+              </div>
+              <button
+                className={`theme-btn ${theme === 'dark' ? 'active' : ''}`}
+                onClick={toggleTheme}
+                title="Modo oscuro"
+                aria-label="Dark mode"
+              >
+                <Moon size={20} />
+              </button>
+            </>
+          )}
         </div>
-        <p className="theme-label" style={{ marginBottom: '16px' }}>{theme === 'light' ? 'Claro' : 'Oscuro'}</p>
+        {!isCollapsed && (
+          <p className="theme-label">{theme === 'light' ? 'Claro' : 'Oscuro'}</p>
+        )}
 
+        {/* CERRAR SESIÓN */}
         <button
           onClick={() => supabase.auth.signOut()}
-          className="sidebar-logout-btn"
           title="Cerrar sesión"
+          style={{
+            marginTop: '8px',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            gap: '8px',
+            padding: isCollapsed ? '8px' : '8px 12px',
+            background: 'none',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#ef4444',
+            fontSize: '13px',
+            fontWeight: '600',
+            cursor: 'pointer',
+            transition: 'background-color 80ms ease',
+          }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.1)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
         >
-          <LogOut size={20} />
-          <span className="nav-label">Cerrar sesión</span>
+          <LogOut size={17} />
+          {!isCollapsed && <span>Cerrar sesión</span>}
         </button>
       </div>
     </nav>
   );
 }
-
-// Memoizar el Sidebar: evita re-renders cuando cambia currentPage u otros
-// estados del padre que no afectan la estructura del Sidebar.
-export const Sidebar = memo(SidebarComponent);

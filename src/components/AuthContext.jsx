@@ -9,9 +9,9 @@ import { supabase } from '../supabase';
 //   → NO ve: Choferes, Clientes
 // ═══════════════════════════════════════════════════════════════
 export const ADMIN_EMAILS = [
-  // 'maxirusso20@gmail.com',
-  // 'fedeavila@gmail.com',
-  // 'lucas.figueredo092@gmail.com',
+  'maxirusso20@gmail.com',
+  'fedeavila@gmail.com',
+  'lucas.figueredo092@gmail.com',
 ];
 
 export const AuthContext = createContext(null);

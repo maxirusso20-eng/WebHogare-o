@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, createContext, useRef, useCo
 import { supabase } from './supabase';
 import './index.css';
 import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle } from 'lucide-react';
-import { DashboardSabados } from './DashboardSabados';
+import { DashboardSabados } from './components/DashboardSabados';
 import {
   DndContext,
   closestCenter,

@@ -32,6 +32,7 @@ import { PantallaLogin } from './components/PantallaLogin';
 import { PantallaChat } from './components/PantallaChat';
 import { PantallaMaps } from './components/PantallaMaps';
 import { PantallaRoles } from './components/PantallaRoles';
+import { ModalConfirmacion } from './components/ModalConfirmacion';
 
 // ────────────────────────────────────────────────────────────────────────
 // CONTEXTO GLOBAL
@@ -45,15 +46,11 @@ function App() {
   const [choferes, setChoferes] = useState([]);
   const [colectas, setColectas] = useState([]);
   const [clientes, setClientes] = useState([]);
-  const [subadmins, setSubadmins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [toasts, setToasts] = useState([]);
   const [isSidebarMobileOpen, setIsSidebarMobileOpen] = useState(false);
-
-  const SUPER_ADMIN = 'maxirusso20@gmail.com';
-  const isSuperAdmin = session?.user?.email?.toLowerCase() === SUPER_ADMIN;
 
   // ─── APLICAR TEMA AL CARGAR ────────────────────────────
   useEffect(() => {
@@ -296,9 +293,6 @@ function App() {
     setColectas,
     clientes,
     setClientes,
-    subadmins,
-    setSubadmins,
-    isSuperAdmin,
     loading,
     currentPage,
     setCurrentPage,
@@ -350,8 +344,8 @@ function App() {
           <main className="main-content">
             {currentPage === 'dashboard' && <PantallaDashboard />}
             {currentPage === 'recorridos' && <PantallaRecorridos />}
-            {currentPage === 'choferes' && role === 'admin' && <PantallaChoferes />}
-            {currentPage === 'clientes' && role === 'admin' && <PantallaClientes />}
+            {currentPage === 'choferes' && ['admin', 'subadmin'].includes(role) && <PantallaChoferes />}
+            {currentPage === 'clientes' && ['admin', 'subadmin'].includes(role) && <PantallaClientes />}
             {currentPage === 'maps' && <PantallaMaps />}
             {currentPage === 'chat' && <PantallaChat />}
             {currentPage === 'roles' && role === 'admin' && <PantallaRoles />}
@@ -1018,18 +1012,7 @@ function PantallaRecorridos() {
                               Localidad
                             </div>
                           </th>
-                          <th style={{
-                            padding: '12px 10px',
-                            textAlign: 'center',
-                            color: colors.textSecondary,
-                            fontWeight: '600',
-                            fontSize: '11px',
-                            letterSpacing: '0.5px',
-                            textTransform: 'uppercase',
-                            width: '70px',
-                          }}>
-                            ID CHOFER
-                          </th>
+
                           <th style={{
                             padding: '12px 16px',
                             textAlign: 'center',
@@ -1199,6 +1182,7 @@ function PantallaRecorridos() {
         zona={selectedZona}
         onClose={() => setIsModalOpen(false)}
         onConfirm={confirmarAgregarLocalidad}
+        theme={theme}
       />
 
       {/* MODAL CONFIRMAR ELIMINAR RECORRIDO */}
@@ -1864,6 +1848,23 @@ function SortableFilaLocalidad({
     isDragging,
   } = useSortable({ id: item.id });
 
+  // Estado local — edición sin guardar en cada tecla
+  const [localPqteDia, setLocalPqteDia] = useState(item.pqteDia ?? '');
+  const [localPorFuera, setLocalPorFuera] = useState(item.porFuera ?? '');
+  const [localEntregados, setLocalEntregados] = useState(item.entregados ?? '');
+
+  // Sincronizar si el item cambia desde afuera (realtime de otro usuario)
+  useEffect(() => { setLocalPqteDia(item.pqteDia ?? ''); }, [item.pqteDia]);
+  useEffect(() => { setLocalPorFuera(item.porFuera ?? ''); }, [item.porFuera]);
+  useEffect(() => { setLocalEntregados(item.entregados ?? ''); }, [item.entregados]);
+
+  // % se actualiza solo cuando cambia entregados (usa pqteDia/porFuera de BD, no locales)
+  const totalBD = (parseInt(item.pqteDia) || 0) + (parseInt(item.porFuera) || 0);
+  const pctLocalNum = totalBD > 0
+    ? parseFloat((((parseInt(localEntregados) || 0) / totalBD) * 100).toFixed(1))
+    : 0;
+  const pctLocalStr = totalBD > 0 ? pctLocalNum + '%' : '—';
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition || 'transform 200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
@@ -1944,48 +1945,52 @@ function SortableFilaLocalidad({
         />
       </td>
 
-      {/* INPUT ID CHOFER */}
+      {/* CHOFER — select desplegable */}
       <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-        <input
-          type="number"
+        <select
           value={item.idChofer || ''}
-          placeholder="ID"
-          onChange={(e) => guardarCambioBD(item.id, 'idChofer', parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+            guardarCambioBD(item.id, 'idChofer', val);
+          }}
           style={{
             padding: '5px 8px',
             border: `1px solid ${colors.borderLight}`,
             borderRadius: '6px',
             backgroundColor: colors.inputBg,
-            color: colors.textPrimary,
+            color: item.idChofer ? colors.textPrimary : colors.textSecondary,
             fontSize: '13px',
             fontWeight: '600',
             outline: 'none',
-            cursor: 'text',
-            width: '70px',
-            textAlign: 'center',
+            cursor: 'pointer',
+            maxWidth: '160px',
             transition: 'all 0.2s ease',
+            appearance: 'auto',
           }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
           onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
-        />
-      </td>
-
-      {/* NOMBRE CHOFER */}
-      <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '600', color: colors.textPrimary }}>
-        <div style={{ display: 'inline-block', backgroundColor: `${zoneColor}15`, padding: '4px 10px', borderRadius: '6px', fontSize: '13px' }}>
-          {obtenerNombreChofer(item.idChofer)}
-        </div>
+        >
+          <option value="">— Sin chofer —</option>
+          {choferes.map(c => (
+            <option key={c.id} value={c.id}>{c.nombre}</option>
+          ))}
+        </select>
       </td>
 
       {/* PQTE DÍA */}
       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
         <input
           type="number"
-          value={item.pqteDia || ''}
-          onChange={(e) => guardarCambioBD(item.id, 'pqteDia', e.target.value)}
+          value={localPqteDia}
+          onChange={(e) => setLocalPqteDia(e.target.value)}
+          onBlur={(e) => {
+            guardarCambioBD(item.id, 'pqteDia', e.target.value);
+            e.target.style.borderColor = colors.borderLight;
+            e.target.style.boxShadow = 'none';
+            e.target.style.backgroundColor = colors.inputBg;
+          }}
           style={{ ...inputStyle, width: '60px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
-          onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
         />
       </td>
 
@@ -1993,11 +1998,16 @@ function SortableFilaLocalidad({
       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
         <input
           type="number"
-          value={item.porFuera || ''}
-          onChange={(e) => guardarCambioBD(item.id, 'porFuera', e.target.value)}
+          value={localPorFuera}
+          onChange={(e) => setLocalPorFuera(e.target.value)}
+          onBlur={(e) => {
+            guardarCambioBD(item.id, 'porFuera', e.target.value);
+            e.target.style.borderColor = colors.borderLight;
+            e.target.style.boxShadow = 'none';
+            e.target.style.backgroundColor = colors.inputBg;
+          }}
           style={{ ...inputStyle, width: '60px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
-          onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
         />
       </td>
 
@@ -2005,11 +2015,16 @@ function SortableFilaLocalidad({
       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
         <input
           type="number"
-          value={item.entregados || ''}
-          onChange={(e) => guardarCambioBD(item.id, 'entregados', e.target.value)}
+          value={localEntregados}
+          onChange={(e) => setLocalEntregados(e.target.value)}
+          onBlur={(e) => {
+            guardarCambioBD(item.id, 'entregados', e.target.value);
+            e.target.style.borderColor = colors.borderLight;
+            e.target.style.boxShadow = 'none';
+            e.target.style.backgroundColor = colors.inputBg;
+          }}
           style={{ ...inputStyle, width: '60px' }}
           onFocus={(e) => { e.target.style.borderColor = zoneColor; e.target.style.boxShadow = `0 0 0 3px ${zoneColor}20`; e.target.style.backgroundColor = colors.inputFocusBg; }}
-          onBlur={(e) => { e.target.style.borderColor = colors.borderLight; e.target.style.boxShadow = 'none'; e.target.style.backgroundColor = colors.inputBg; }}
         />
       </td>
 
@@ -2023,12 +2038,12 @@ function SortableFilaLocalidad({
           borderRadius: '20px',
           fontSize: '12px',
           fontWeight: '700',
-          backgroundColor: `${getPercentageColor(porcentajeStr)}20`,
-          color: getPercentageColor(porcentajeStr),
-          border: `1px solid ${getPercentageColor(porcentajeStr)}40`,
+          backgroundColor: `${getPercentageColor(pctLocalStr)}20`,
+          color: getPercentageColor(pctLocalStr),
+          border: `1px solid ${getPercentageColor(pctLocalStr)}40`,
           minWidth: '52px',
         }}>
-          {porcentajeStr}
+          {pctLocalStr}
         </span>
       </td>
 

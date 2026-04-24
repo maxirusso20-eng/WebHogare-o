@@ -6,6 +6,21 @@ import { useAuth } from './AuthContext';
 import { ADMIN_EMAILS } from './AuthContext';
 import { labelFromEmail, colorFromEmail, esAdminEmail, ChatBurbuja } from './ChatBurbuja';
 
+// ── Cargar mapa email→nombre desde tabla Choferes ─────────────────────────────
+async function cargarMapaNombres() {
+  const { data } = await supabase.from('Choferes').select('email, nombre');
+  const mapa = {};
+  (data || []).forEach(c => {
+    if (c.email) mapa[c.email.toLowerCase()] = c.nombre;
+  });
+  return mapa;
+}
+
+function nombreDeEmail(email, mapa) {
+  if (!email) return '?';
+  return mapa[email.toLowerCase()] || labelFromEmail(email);
+}
+
 // ── Audio recorder ────────────────────────────────────────────────────────────
 function useAudioRecorder() {
   const [grabando, setGrabando] = useState(false);
@@ -160,6 +175,7 @@ export function PantallaChat() {
   const [mensajes, setMensajes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingC, setLoadingC] = useState(true);
+  const [nombresMap, setNombresMap] = useState({});
   const bottomRef = useRef(null);
 
   // ── Cargar contactos ──────────────────────────────────────────────────────
@@ -167,48 +183,117 @@ export function PantallaChat() {
     if (!miEmail) return;
     const cargar = async () => {
       setLoadingC(true);
+
+      // Cargar mapa email→nombre desde Choferes
+      const mapa = await cargarMapaNombres();
+      // Agregar admins hardcodeados al mapa si tienen nombre
+      setNombresMap(mapa);
+
       if (esAdminUser) {
-        // Colegas admin
+        // Colegas admin (otros emails en ADMIN_EMAILS)
         const colegas = ADMIN_EMAILS
           .filter(e => e.toLowerCase() !== miEmail.toLowerCase())
-          .map(e => ({ email: e, nombre: labelFromEmail(e), color: colorFromEmail(e), tipo: 'admin' }));
+          .map(e => ({
+            email: e,
+            nombre: nombreDeEmail(e, mapa),
+            color: colorFromEmail(e),
+            tipo: 'admin',
+          }));
 
-        // Choferes que escribieron (distinct chofer_email donde remitente='chofer')
-        const { data } = await supabase.from('mensajes').select('chofer_email').eq('remitente', 'chofer');
-        const set = new Set();
-        (data || []).forEach(m => { if (m.chofer_email) set.add(m.chofer_email.toLowerCase()); });
-        const choferes = [...set]
-          .filter(e => !esAdminEmail(e))
-          .map(e => ({ email: e, nombre: labelFromEmail(e), color: colorFromEmail(e), tipo: 'chofer' }));
+        // Todos los emails con quienes tuve conversación (por chofer_email o admin_id)
+        const { data: comoAdmin } = await supabase
+          .from('mensajes')
+          .select('chofer_email')
+          .eq('admin_id', miEmail)
+          .not('chofer_email', 'is', null);
 
-        const todos = [...colegas, ...choferes];
+        const { data: comoChofer } = await supabase
+          .from('mensajes')
+          .select('admin_id')
+          .eq('chofer_email', miEmail)
+          .not('admin_id', 'is', null);
+
+        const emailsSet = new Set();
+        (comoAdmin || []).forEach(m => {
+          if (m.chofer_email && m.chofer_email.toLowerCase() !== miEmail.toLowerCase())
+            emailsSet.add(m.chofer_email.toLowerCase());
+        });
+        (comoChofer || []).forEach(m => {
+          if (m.admin_id && m.admin_id.toLowerCase() !== miEmail.toLowerCase())
+            emailsSet.add(m.admin_id.toLowerCase());
+        });
+
+        const adminSet = new Set(ADMIN_EMAILS.map(e => e.toLowerCase()));
+        const otrosEmails = [...emailsSet].filter(e => !colegas.some(c => c.email.toLowerCase() === e));
+        const contactosExtra = otrosEmails.map(e => ({
+          email: e,
+          nombre: nombreDeEmail(e, mapa),
+          color: colorFromEmail(e),
+          tipo: adminSet.has(e) ? 'admin' : 'chofer',
+        }));
+
+        const todos = [...colegas, ...contactosExtra];
         setContactos(todos);
         if (todos.length && !contactoActivo) setContactoActivo(todos[0]);
       } else {
-        // Viewer/chofer → solo admins
-        const lista = ADMIN_EMAILS.map(e => ({ email: e, nombre: labelFromEmail(e), color: colorFromEmail(e), tipo: 'admin' }));
-        setContactos(lista);
-        if (lista.length && !contactoActivo) setContactoActivo(lista[0]);
+        // Coordinador/chofer → ve todos los admins
+        const lista = ADMIN_EMAILS.map(e => ({
+          email: e,
+          nombre: nombreDeEmail(e, mapa),
+          color: colorFromEmail(e),
+          tipo: 'admin',
+        }));
+
+        // + otros admins que le escribieron
+        const { data } = await supabase
+          .from('mensajes')
+          .select('admin_id')
+          .eq('chofer_email', miEmail)
+          .not('admin_id', 'is', null);
+
+        const adminSet = new Set(ADMIN_EMAILS.map(e => e.toLowerCase()));
+        const extras = new Set();
+        (data || []).forEach(m => {
+          const e = m.admin_id?.toLowerCase();
+          if (e && !adminSet.has(e)) extras.add(e);
+        });
+        const extraAdmins = [...extras].map(e => ({
+          email: e,
+          nombre: nombreDeEmail(e, mapa),
+          color: colorFromEmail(e),
+          tipo: 'admin',
+        }));
+
+        const todosLista = [...lista, ...extraAdmins];
+        setContactos(todosLista);
+        if (todosLista.length && !contactoActivo) setContactoActivo(todosLista[0]);
       }
       setLoadingC(false);
     };
     cargar();
   }, [miEmail, esAdminUser]);
 
-  // ── Realtime inbox: nuevos choferes que escriben ──────────────────────────
+  // ── Realtime inbox: nuevos contactos ─────────────────────────────────────
   useEffect(() => {
     if (!miEmail || !esAdminUser) return;
     const canal = supabase.channel(`inbox:${miEmail}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
         const m = payload.new;
-        if (m.remitente !== 'chofer' || !m.chofer_email) return;
+        if (m.admin_id !== miEmail || !m.chofer_email) return;
         setContactos(prev => {
           if (prev.some(c => c.email.toLowerCase() === m.chofer_email.toLowerCase())) return prev;
-          return [...prev, { email: m.chofer_email, nombre: labelFromEmail(m.chofer_email), color: colorFromEmail(m.chofer_email), tipo: 'chofer' }];
+          const adminSet = new Set(ADMIN_EMAILS.map(e => e.toLowerCase()));
+          const tipo = adminSet.has(m.chofer_email.toLowerCase()) ? 'admin' : 'chofer';
+          return [...prev, {
+            email: m.chofer_email,
+            nombre: nombreDeEmail(m.chofer_email, nombresMap),
+            color: colorFromEmail(m.chofer_email),
+            tipo,
+          }];
         });
       }).subscribe();
     return () => supabase.removeChannel(canal);
-  }, [miEmail, esAdminUser]);
+  }, [miEmail, esAdminUser, nombresMap]);
 
   // ── Cargar mensajes del contacto activo ───────────────────────────────────
   useEffect(() => {
@@ -216,41 +301,32 @@ export function PantallaChat() {
     setLoading(true); setMensajes([]);
 
     const fetch = async () => {
-      let query = supabase.from('mensajes').select('*').order('created_at', { ascending: true });
+      const emailA = miEmail.toLowerCase();
+      const emailB = contactoActivo.email.toLowerCase();
 
-      if (esAdminUser && contactoActivo.tipo === 'admin') {
-        // Admin ↔ Admin: cruzado por admin_id y chofer_email
-        query = query.or(
-          `and(admin_id.eq.${miEmail},chofer_email.eq.${contactoActivo.email}),` +
-          `and(admin_id.eq.${contactoActivo.email},chofer_email.eq.${miEmail})`
-        );
-      } else if (esAdminUser && contactoActivo.tipo === 'chofer') {
-        // Admin viendo chat con chofer
-        query = query.eq('chofer_email', contactoActivo.email);
-      } else {
-        // Chofer viendo su propio chat
-        query = query.eq('chofer_email', miEmail);
-      }
+      const { data, error } = await supabase
+        .from('mensajes')
+        .select('*')
+        .or(
+          `and(chofer_email.eq.${emailA},admin_id.eq.${emailB}),` +
+          `and(chofer_email.eq.${emailB},admin_id.eq.${emailA})`
+        )
+        .order('created_at', { ascending: true });
 
-      const { data, error } = await query;
       if (!error) setMensajes(data || []);
       setLoading(false);
     };
     fetch();
 
-    // Realtime
-    const canal = supabase.channel(`chat:${miEmail}:${contactoActivo.email}`)
+    // Realtime bidireccional
+    const emailA = miEmail.toLowerCase();
+    const emailB = contactoActivo.email.toLowerCase();
+    const canal = supabase.channel(`chat:${emailA}:${emailB}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
         const m = payload.new;
-        let ok = false;
-        if (esAdminUser && contactoActivo.tipo === 'admin') {
-          ok = (m.admin_id === miEmail && m.chofer_email === contactoActivo.email) ||
-               (m.admin_id === contactoActivo.email && m.chofer_email === miEmail);
-        } else if (esAdminUser) {
-          ok = m.chofer_email === contactoActivo.email;
-        } else {
-          ok = m.chofer_email === miEmail;
-        }
+        const ce = m.chofer_email?.toLowerCase();
+        const ai = m.admin_id?.toLowerCase();
+        const ok = (ce === emailA && ai === emailB) || (ce === emailB && ai === emailA);
         if (ok) setMensajes(prev => [...prev, m]);
       }).subscribe();
     return () => supabase.removeChannel(canal);
@@ -261,37 +337,47 @@ export function PantallaChat() {
   // ── Enviar mensaje ────────────────────────────────────────────────────────
   const onEnviar = useCallback(async ({ texto, media_url, media_type }) => {
     if (!contactoActivo?.email) return;
-    const row = { texto, media_url, media_type, estado: 'enviado' };
 
-    if (esAdminUser) {
-      row.remitente = 'admin';
-      row.admin_id  = miEmail;
-      row.chofer_email = contactoActivo.email; // para admin-admin, otro admin es el "chofer_email"
-      row.visto_admin  = true;
-      row.visto_chofer = false;
+    const adminSet = new Set(ADMIN_EMAILS.map(e => e.toLowerCase()));
+    const soyAdmin = esAdminUser || adminSet.has(miEmail.toLowerCase());
+
+    // remitente = nombre real si lo tenemos, si no el email
+    const miNombre = nombresMap[miEmail.toLowerCase()] || miEmail;
+
+    const row = {
+      texto,
+      media_url,
+      media_type,
+      estado: 'enviado',
+      remitente: miNombre,
+      visto_admin: soyAdmin,
+      visto_chofer: !soyAdmin,
+    };
+
+    if (soyAdmin) {
+      row.admin_id = miEmail;
+      row.chofer_email = contactoActivo.email;
     } else {
-      row.remitente    = 'chofer';
       row.chofer_email = miEmail;
-      row.visto_admin  = false;
-      row.visto_chofer = true;
+      row.admin_id = contactoActivo.email;
     }
 
     const { error } = await supabase.from('mensajes').insert([row]);
     if (error) console.error('Error al enviar:', error);
-  }, [miEmail, esAdminUser, contactoActivo]);
+  }, [miEmail, esAdminUser, contactoActivo, nombresMap]);
 
   // ── Agrupar por fecha ─────────────────────────────────────────────────────
   const formatFecha = ts => ts ? new Date(ts).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
   const grupos = mensajes.reduce((acc, m, i) => {
     const d = new Date(m.created_at).toDateString();
-    const p = i > 0 ? new Date(mensajes[i-1].created_at).toDateString() : null;
+    const p = i > 0 ? new Date(mensajes[i - 1].created_at).toDateString() : null;
     if (d !== p) acc.push({ tipo: 'fecha', valor: formatFecha(m.created_at), key: `f${i}` });
     acc.push({ tipo: 'msg', data: m, key: m.id });
     return acc;
   }, []);
 
   const colegasAdmin = contactos.filter(c => c.tipo === 'admin');
-  const choferes     = contactos.filter(c => c.tipo === 'chofer');
+  const choferes = contactos.filter(c => c.tipo === 'chofer');
 
   const renderContacto = c => {
     const activo = contactoActivo?.email?.toLowerCase() === c.email.toLowerCase();
@@ -305,7 +391,7 @@ export function PantallaChat() {
         </div>
         <div style={{ textAlign: 'left', overflow: 'hidden' }}>
           <p style={{ margin: 0, fontSize: '13px', fontWeight: activo ? '700' : '600', color: activo ? c.color : text1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</p>
-          <p style={{ margin: 0, fontSize: '10px', color: text2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.email}</p>
+
         </div>
       </button>
     );
@@ -366,7 +452,7 @@ export function PantallaChat() {
               </div>
               <div>
                 <p style={{ margin: 0, fontWeight: '700', fontSize: '15px', color: text1 }}>{contactoActivo.nombre}</p>
-                <p style={{ margin: 0, fontSize: '11px', color: text2 }}>{contactoActivo.email}</p>
+                <p style={{ margin: 0, fontSize: '11px', color: text2 }}>{contactoActivo.tipo === 'admin' ? 'Admin' : 'Coordinador'}</p>
               </div>
             </div>
 

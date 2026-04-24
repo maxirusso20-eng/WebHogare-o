@@ -1,8 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 
-export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
+export function ModalAgregar({ isOpen, zona, onClose, onConfirm, theme = 'dark' }) {
   const [localidad, setLocalidad] = useState('');
+  const isDark = theme === 'dark';
+  const modalBg = isDark ? '#1e293b' : '#ffffff';
+  const borderCol = isDark ? '#334155' : '#e2e8f0';
+  const textPrim = isDark ? '#f8fafc' : '#1e293b';
+  const textSec = isDark ? '#cbd5e1' : '#64748b';
+  const inputBg = isDark ? '#0f172a' : '#f8fafc';
+  const inputFocusBg = isDark ? '#1a2540' : '#ffffff';
+  const inputBord = isDark ? '#475569' : '#cbd5e1';
+  const accent = '#64b5f6';
 
   // Cerrar al presionar Escape
   useEffect(() => {
@@ -40,9 +49,7 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        
-        
+        backgroundColor: isDark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.3)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -53,13 +60,13 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
       {/* MODAL BOX */}
       <div
         style={{
-          backgroundColor: '#1e293b',
+          backgroundColor: modalBg,
           borderRadius: '16px',
           padding: '28px',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+          boxShadow: isDark ? '0 25px 50px -12px rgba(0,0,0,0.5)' : '0 25px 50px -12px rgba(0,0,0,0.15)',
           maxWidth: '400px',
           width: '90%',
-          border: '1px solid #334155',
+          border: `1px solid ${borderCol}`,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -67,7 +74,7 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
         <h2
           style={{
             margin: '0 0 12px 0',
-            color: '#f8fafc',
+            color: textPrim,
             fontSize: '20px',
             fontWeight: '700',
             letterSpacing: '-0.5px',
@@ -80,7 +87,7 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
         <p
           style={{
             margin: '0 0 20px 0',
-            color: '#cbd5e1',
+            color: textSec,
             fontSize: '14px',
             fontWeight: '500',
           }}
@@ -103,10 +110,10 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
           style={{
             width: '100%',
             padding: '12px 14px',
-            border: '1px solid #475569',
+            border: `1px solid ${inputBord}`,
             borderRadius: '10px',
             backgroundColor: '#0f172a',
-            color: '#f8fafc',
+            color: textPrim,
             fontSize: '14px',
             fontWeight: '500',
             outline: 'none',
@@ -115,14 +122,14 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
             marginBottom: '20px',
           }}
           onFocus={(e) => {
-            e.target.style.borderColor = '#64b5f6';
+            e.target.style.borderColor = accent;
             e.target.style.boxShadow = '0 0 0 3px rgba(100, 181, 246, 0.15)';
-            e.target.style.backgroundColor = '#1a2540';
+            e.target.style.backgroundColor = inputFocusBg;
           }}
           onBlur={(e) => {
-            e.target.style.borderColor = '#475569';
+            e.target.style.borderColor = inputBord;
             e.target.style.boxShadow = 'none';
-            e.target.style.backgroundColor = '#0f172a';
+            e.target.style.backgroundColor = inputBg;
           }}
         />
 
@@ -144,20 +151,20 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
               padding: '10px 16px',
               border: '1px solid #475569',
               borderRadius: '8px',
-              backgroundColor: '#334155',
-              color: '#e2e8f0',
+              backgroundColor: isDark ? '#334155' : '#f1f5f9',
+              color: textPrim,
               fontSize: '14px',
               fontWeight: '600',
               cursor: 'pointer',
               transition: 'border-color 80ms ease, background-color 80ms ease',
             }}
             onMouseEnter={(e) => {
-              e.target.style.backgroundColor = '#475569';
-              e.target.style.borderColor = '#64748b';
+              e.target.style.backgroundColor = isDark ? '#475569' : '#e2e8f0';
+              e.target.style.borderColor = isDark ? '#64748b' : '#cbd5e1';
             }}
             onMouseLeave={(e) => {
-              e.target.style.backgroundColor = '#334155';
-              e.target.style.borderColor = '#475569';
+              e.target.style.backgroundColor = isDark ? '#334155' : '#f1f5f9';
+              e.target.style.borderColor = inputBord;
             }}
           >
             <X size={16} strokeWidth={2.5} />
@@ -207,12 +214,12 @@ export function ModalAgregar({ isOpen, zona, onClose, onConfirm }) {
         <p
           style={{
             margin: '16px 0 0 0',
-            color: '#64748b',
+            color: textSec,
             fontSize: '12px',
             textAlign: 'center',
           }}
         >
-          💡 Presioná <kbd style={{ backgroundColor: '#334155', padding: '2px 6px', borderRadius: '4px', color: '#cbd5e1' }}>Esc</kbd> para cerrar
+          💡 Presioná <kbd style={{ backgroundColor: isDark ? '#334155' : '#e2e8f0', padding: '2px 6px', borderRadius: '4px', color: textSec }}>Esc</kbd> para cerrar
         </p>
       </div>
     </div>

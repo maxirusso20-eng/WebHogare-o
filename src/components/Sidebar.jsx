@@ -13,7 +13,6 @@ export function Sidebar({
   setIsMobileOpen
 }) {
   const { role } = useAuth();
-  const isAdmin = role === 'admin';
 
   const [isCollapsed, setIsCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
@@ -36,18 +35,21 @@ export function Sidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Admin/subadmin → todo. Viewer → solo Dashboard, Recorridos, Maps, Chat
+  // Permisos por rol:
+  //   admin       → todo
+  //   subadmin    → todo menos Roles
+  //   coordinador → Dashboard, Recorridos, Maps, Chat
   const allNavItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
-    { id: 'clientes', label: 'Clientes', icon: UsersRound, adminOnly: true },
-    { id: 'choferes', label: 'Choferes', icon: CarFront, adminOnly: true },
-    { id: 'recorridos', label: 'Recorridos', icon: Route, adminOnly: false },
-    { id: 'maps', label: 'Maps', icon: Globe, adminOnly: false },
-    { id: 'chat', label: 'Chat', icon: MessageCircle, adminOnly: false },
-    { id: 'roles', label: 'Roles', icon: ShieldCheck, adminOnly: true },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'subadmin', 'coordinador'] },
+    { id: 'clientes', label: 'Clientes', icon: UsersRound, roles: ['admin', 'subadmin'] },
+    { id: 'choferes', label: 'Choferes', icon: CarFront, roles: ['admin', 'subadmin'] },
+    { id: 'recorridos', label: 'Recorridos', icon: Route, roles: ['admin', 'subadmin', 'coordinador'] },
+    { id: 'maps', label: 'Maps', icon: Globe, roles: ['admin', 'subadmin', 'coordinador'] },
+    { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'subadmin', 'coordinador'] },
+    { id: 'roles', label: 'Roles', icon: ShieldCheck, roles: ['admin'] },
   ];
 
-  const navItems = allNavItems.filter(item => isAdmin || !item.adminOnly);
+  const navItems = allNavItems.filter(item => item.roles.includes(role));
 
   const iconVolumeShadow =
     theme === 'light'

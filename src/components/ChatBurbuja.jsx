@@ -6,7 +6,7 @@ export function labelFromEmail(email) {
   return local.charAt(0).toUpperCase() + local.slice(1);
 }
 
-const PALETTE = ['#3b82f6','#8b5cf6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899'];
+const PALETTE = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 export function colorFromEmail(email) {
   if (!email) return PALETTE[0];
   let h = 0;
@@ -28,7 +28,7 @@ function isUrl(str) {
 
 function ContenidoMensaje({ m, esMio }) {
   const tipo = m.media_type || 'texto';
-  const url  = m.media_url;
+  const url = m.media_url;
 
   if (tipo === 'imagen' && url) return (
     <div>
@@ -70,18 +70,28 @@ function ContenidoMensaje({ m, esMio }) {
 export function ChatBurbuja({ m, miEmail, esAdminUser, isDark, contactoColor }) {
   // esMio: si soy admin → mis mensajes tienen remitente='admin' y admin_id=miEmail
   //        si soy chofer → mis mensajes tienen remitente='chofer' y chofer_email=miEmail
+  // Determinar si el mensaje es mío usando los campos de email
+  const miEmailL = miEmail?.toLowerCase() ?? '';
   const esMio = esAdminUser
-    ? (m.remitente === 'admin' && m.admin_id?.toLowerCase() === miEmail?.toLowerCase())
-    : (m.remitente === 'chofer' && m.chofer_email?.toLowerCase() === miEmail?.toLowerCase());
+    ? m.admin_id?.toLowerCase() === miEmailL
+    : m.chofer_email?.toLowerCase() === miEmailL;
 
   const bubbleBg = isDark ? '#1e293b' : '#ffffff';
-  const border   = isDark ? '#334155' : '#e2e8f0';
-  const text1    = isDark ? '#f1f5f9' : '#1e293b';
-  const text2    = isDark ? '#94a3b8' : '#64748b';
+  const border = isDark ? '#334155' : '#e2e8f0';
+  const text1 = isDark ? '#f1f5f9' : '#1e293b';
+  const text2 = isDark ? '#94a3b8' : '#64748b';
 
-  // Email del remitente para avatar/color
-  const senderEmail = m.remitente === 'admin' ? m.admin_id : m.chofer_email;
+  // Email del remitente para avatar/color (usar el campo de email, no remitente)
+  const senderEmail = esAdminUser
+    ? (m.admin_id?.toLowerCase() === miEmailL ? m.admin_id : m.chofer_email)
+    : (m.chofer_email?.toLowerCase() === miEmailL ? m.chofer_email : m.admin_id);
   const leido = esAdminUser ? m.visto_admin : m.visto_chofer;
+
+  // Nombre a mostrar: usar el campo remitente (que ahora guardamos como nombre real)
+  // Si es un mensaje viejo con remitente='admin'/'chofer', usar labelFromEmail
+  const nombreMostrar = m.remitente === 'admin' || m.remitente === 'chofer'
+    ? labelFromEmail(senderEmail)
+    : (m.remitente || labelFromEmail(senderEmail));
 
   return (
     <div style={{ display: 'flex', justifyContent: esMio ? 'flex-end' : 'flex-start', marginBottom: '3px', alignItems: 'flex-end', gap: '6px' }}>
@@ -107,7 +117,7 @@ export function ChatBurbuja({ m, miEmail, esAdminUser, isDark, contactoColor }) 
         {/* Nombre del remitente (solo si no es mío) */}
         {!esMio && (
           <p style={{ margin: '0 0 2px', fontSize: '10px', fontWeight: '700', color: colorFromEmail(senderEmail) }}>
-            {labelFromEmail(senderEmail)}
+            {nombreMostrar}
           </p>
         )}
         <ContenidoMensaje m={m} esMio={esMio} />

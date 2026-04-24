@@ -134,15 +134,15 @@ function App() {
     }, 3000);
   };
 
-  const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light';
-    // Apply synchronously before React re-render for instant visual switch
-    document.documentElement.setAttribute('data-theme', newTheme);
-    document.body.className = `theme-${newTheme}`;
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
-    setTheme(newTheme);
-    localStorage.setItem('theme', newTheme);
-  };
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      document.body.className = `theme-${next}`;
+      localStorage.setItem('theme', next);
+      return next;
+    });
+  }, []);
 
   const guardarChofer = async (choferData) => {
     try {
@@ -286,7 +286,9 @@ function App() {
     }
   };
 
-  const contextValue = {
+  // useMemo evita que todos los consumidores del contexto re-rendericen
+  // cuando solo cambia theme u otro valor no relacionado
+  const contextValue = useMemo(() => ({
     choferes,
     setChoferes,
     colectas,
@@ -307,7 +309,13 @@ function App() {
     handleEliminarClienteConfirm,
     handleEliminarClienteCancel,
     handleOpenConfirmDeleteModal,
-  };
+  }), [
+    choferes, colectas, clientes, loading, currentPage, theme,
+    toggleTheme, guardarChofer, eliminarChofer, guardarColecta,
+    eliminarRecorrido, mostrarToast,
+    handleEliminarCliente, handleEliminarClienteConfirm,
+    handleEliminarClienteCancel, handleOpenConfirmDeleteModal,
+  ]);
 
   // ─── RENDER ───────────────────────────────────────────
   if (authLoading || loading) {
@@ -789,7 +797,7 @@ function PantallaRecorridos() {
   };
 
   // 3. FUNCIÓN PARA GUARDAR CAMBIOS AUTOMÁTICAMENTE (apunta a tablaActual)
-  const guardarCambioBD = async (id, campo, valor) => {
+  const guardarCambioBD = useCallback(async (id, campo, valor) => {
     const num = parseInt(valor) || 0;
     setColectasLocales(prev => prev.map(item =>
       item.id === id ? { ...item, [campo]: num } : item
@@ -799,7 +807,7 @@ function PantallaRecorridos() {
       .update({ [campo]: num })
       .eq('id', id);
     if (error) console.error('Error al sincronizar:', error.message);
-  };
+  }, [tablaActual]);
 
   // 4. FUNCIÓN PARA GUARDAR LOCALIDAD EDITADA INLINE (apunta a tablaActual)
   const guardarLocalidad = async (id, nuevoValor) => {

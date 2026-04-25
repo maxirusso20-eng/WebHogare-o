@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, MessageCircle, LogOut, ShieldCheck } from 'lucide-react';
+import { Menu, X, UsersRound, CarFront, Route, Globe, Sun, Moon, LayoutDashboard, MessageCircle, LogOut, ShieldCheck, History, UserCheck } from 'lucide-react';
 import '../styles/sidebar.css';
 import { useAuth } from './AuthContext';
 import { supabase } from '../supabase';
@@ -35,6 +35,61 @@ export function Sidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const { session } = useAuth();
+  const miEmail = session?.user?.email?.toLowerCase() || '';
+
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+
+  useEffect(() => {
+    if (!miEmail || !role) return;
+
+    // Primero contar los actuales
+    const contarNoLeidos = async () => {
+      const isAd = role === 'admin';
+      const f = isAd ? 'visto_admin' : 'visto_chofer';
+      const d = isAd ? 'admin_id' : 'chofer_email';
+      const { count } = await supabase
+        .from('mensajes')
+        .select('*', { count: 'exact', head: true })
+        .eq(d, miEmail)
+        .eq(f, false);
+      setUnreadChatCount(count || 0);
+    };
+
+    contarNoLeidos();
+
+    // Pedir permiso para notificaciones
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // Suscribirse a nuevos mensajes
+    const canal = supabase.channel(`sidebar_chat:${miEmail}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'mensajes' }, payload => {
+        const m = payload.new;
+        const isAd = role === 'admin';
+        const dest = isAd ? m.admin_id : m.chofer_email;
+        if (dest?.toLowerCase() === miEmail) {
+          const visto = isAd ? m.visto_admin : m.visto_chofer;
+          if (!visto) {
+            setUnreadChatCount(prev => prev + 1);
+            if (Notification.permission === 'granted') {
+              new Notification('Nuevo mensaje', {
+                body: `${m.remitente || 'Alguien'}: ${m.texto ? m.texto : 'Mensaje adjunto'}`,
+                icon: '/vite.svg'
+              });
+            }
+          }
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'mensajes' }, payload => {
+        contarNoLeidos(); // Recalcular si alguien leyó
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(canal);
+  }, [miEmail, role]);
+
   // Permisos por rol:
   //   admin       → todo
   //   subadmin    → todo menos Roles
@@ -45,8 +100,10 @@ export function Sidebar({
     { id: 'choferes', label: 'Choferes', icon: CarFront, roles: ['admin', 'subadmin'] },
     { id: 'recorridos', label: 'Recorridos', icon: Route, roles: ['admin', 'subadmin', 'coordinador'] },
     { id: 'maps', label: 'Maps', icon: Globe, roles: ['admin', 'subadmin', 'coordinador'] },
-    { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'subadmin', 'coordinador'] },
+    { id: 'historial-recorridos', label: 'Hist. Recorridos', icon: History, roles: ['admin', 'subadmin'] },
+    { id: 'historial-clientes', label: 'Hist. Clientes', icon: UserCheck, roles: ['admin', 'subadmin'] },
     { id: 'roles', label: 'Roles', icon: ShieldCheck, roles: ['admin'] },
+    { id: 'chat', label: 'Chat', icon: MessageCircle, roles: ['admin', 'subadmin', 'coordinador'] },
   ];
 
   const navItems = allNavItems.filter(item => item.roles.includes(role));
@@ -97,8 +154,13 @@ export function Sidebar({
                   }}
                   title={item.label}
                 >
-                  <span className="nav-icon inline-flex items-center justify-center" style={{ filter: iconVolumeShadow }}>
+                  <span className="nav-icon inline-flex items-center justify-center" style={{ filter: iconVolumeShadow, position: 'relative' }}>
                     {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
+                    {item.id === 'chat' && unreadChatCount > 0 && (
+                      <span style={{ position: 'absolute', top: '-6px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', lineHeight: 1, border: `2px solid ${theme === 'dark' ? '#0f172a' : '#ffffff'}` }}>
+                        {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                      </span>
+                    )}
                   </span>
                   <span className="nav-label">{item.label}</span>
                   {currentPage === item.id && <span className="nav-indicator"></span>}
@@ -167,8 +229,13 @@ export function Sidebar({
               onClick={() => setCurrentPage(item.id)}
               title={item.label}
             >
-              <span className="nav-icon inline-flex items-center justify-center" style={{ filter: iconVolumeShadow }}>
+              <span className="nav-icon inline-flex items-center justify-center" style={{ filter: iconVolumeShadow, position: 'relative' }}>
                 {NavIcon ? <NavIcon size={18} strokeWidth={2.25} /> : null}
+                {item.id === 'chat' && unreadChatCount > 0 && (
+                  <span style={{ position: 'absolute', top: '-6px', right: '-8px', background: '#ef4444', color: 'white', fontSize: '10px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '10px', lineHeight: 1, border: `2px solid ${theme === 'dark' ? '#0f172a' : '#ffffff'}`, transform: isCollapsed ? 'scale(0.85)' : 'scale(1)', transition: 'transform 0.2s' }}>
+                    {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                  </span>
+                )}
               </span>
               {!isCollapsed && <span className="nav-label">{item.label}</span>}
               {!isCollapsed && currentPage === item.id && <span className="nav-indicator"></span>}

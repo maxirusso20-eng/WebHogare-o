@@ -334,6 +334,34 @@ export function PantallaChat() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [mensajes]);
 
+  // ── Marcar como leídos ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!contactoActivo?.email || !miEmail || mensajes.length === 0) return;
+    
+    const adminSet = new Set(ADMIN_EMAILS.map(e => e.toLowerCase()));
+    const soyAdmin = esAdminUser || adminSet.has(miEmail.toLowerCase());
+    
+    // Si soy admin, marco como leído lo que me mandaron y no está visto_admin
+    const fieldToUpdate = soyAdmin ? 'visto_admin' : 'visto_chofer';
+    
+    const idsToMark = mensajes
+      .filter(m => m[fieldToUpdate] === false)
+      .filter(m => {
+        if (soyAdmin) return m.admin_id?.toLowerCase() === miEmail.toLowerCase();
+        return m.chofer_email?.toLowerCase() === miEmail.toLowerCase();
+      })
+      .map(m => m.id);
+      
+    if (idsToMark.length > 0) {
+      supabase.from('mensajes')
+        .update({ [fieldToUpdate]: true })
+        .in('id', idsToMark)
+        .then(() => {
+           // Se actualizarán en la BD y el Sidebar lo notará por Realtime o al recalcular
+        });
+    }
+  }, [mensajes, contactoActivo, miEmail, esAdminUser]);
+
   // ── Enviar mensaje ────────────────────────────────────────────────────────
   const onEnviar = useCallback(async ({ texto, media_url, media_type }) => {
     if (!contactoActivo?.email) return;

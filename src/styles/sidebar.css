@@ -313,7 +313,7 @@
 
 /* ─── MODO OSCURO ────────────────────────────────────────── */
 .sidebar.theme-dark .nav-link {
-  color: #64748b;
+  color: #94a3b8;
   background-color: rgba(30, 41, 59, 0.25);
   border: 1px solid rgba(71, 85, 105, 0.15);
 }
@@ -377,17 +377,11 @@
 }
 
 .sidebar.theme-light .nav-label {
-  background: linear-gradient(135deg, #0284c7, #3b82f6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: inherit;
 }
 
 .sidebar.theme-dark .nav-label {
-  background: linear-gradient(135deg, #e0f2fe, #bfdbfe);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: inherit;
 }
 
 /* Ocultar label cuando colapsado y sin hover */

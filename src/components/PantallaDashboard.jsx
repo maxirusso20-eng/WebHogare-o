@@ -1,389 +1,432 @@
-import { useState, useEffect, useContext, useMemo } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { AppContext } from '../App';
 import { supabase } from '../supabase';
-import {
-    Package, CheckCircle, TrendingUp, Users, AlertTriangle,
-    MapPin, ArrowRight, Activity, Clock, Truck, BarChart2,
-} from 'lucide-react';
+import { useAuth } from './AuthContext';
+import { X, Map, MapPin, MessageCircle } from 'lucide-react';
 
-const ZONAS = ['ZONA OESTE', 'ZONA SUR', 'ZONA NORTE', 'CABA'];
-const ZONA_COLORS = {
+function OverlayBienvenidaChofer({ onClose }) {
+  const { theme, choferes, setCurrentPage } = useContext(AppContext);
+  const { session } = useAuth();
+  const [noMostrar, setNoMostrar] = useState(false);
+
+  const miEmail = session?.user?.email?.toLowerCase();
+  const miChofer = choferes.find(c => c.email?.toLowerCase() === miEmail);
+  const nombre = miChofer ? miChofer.nombre : (miEmail ? miEmail.split('@')[0] : 'Usuario');
+
+  const cardBg = theme === 'light' ? '#ffffff' : '#1e293b';
+  const border = theme === 'light' ? '#e2e8f0' : '#334155';
+  const textPrimary = theme === 'light' ? '#1e293b' : '#f8fafc';
+  const textSecondary = theme === 'light' ? '#64748b' : '#94a3b8';
+
+  const handleClose = () => {
+    if (noMostrar) {
+      localStorage.setItem(`ocultar_bienvenida_${miEmail}`, 'true');
+    }
+    onClose();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 999999,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      background: theme === 'dark' ? 'rgba(2, 6, 23, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      backdropFilter: 'blur(16px)',
+      animation: 'fadeIn 0.3s ease-out forwards',
+      padding: '24px'
+    }}>
+      <div style={{ position: 'relative', background: cardBg, padding: '40px', borderRadius: '32px', boxShadow: theme === 'dark' ? '0 20px 40px rgba(0,0,0,0.5)' : '0 20px 40px rgba(59,130,246,0.15)', border: `1px solid ${border}`, maxWidth: '1000px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+
+        <button
+          onClick={handleClose}
+          style={{ position: 'absolute', top: '24px', right: '24px', background: 'transparent', border: 'none', cursor: 'pointer', color: textSecondary, padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+          onMouseEnter={e => e.currentTarget.style.background = theme === 'dark' ? '#334155' : '#f1f5f9'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <X size={24} />
+        </button>
+
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <div style={{ fontSize: '56px', marginBottom: '12px', animation: 'bounceFloat 2s infinite' }}>🚚</div>
+          <h1 style={{ fontSize: '32px', fontWeight: '800', color: textPrimary, marginBottom: '8px', letterSpacing: '-0.5px' }}>
+            ¡Bienvenido, <span style={{ color: '#3b82f6' }}>{nombre}</span>!
+          </h1>
+          <p style={{ fontSize: '15px', color: textSecondary, lineHeight: '1.6', maxWidth: '600px', margin: '0 auto' }}>
+            Este es tu panel de inicio. Tienes acceso al dashboard para ver el resumen del día. Además, puedes acceder rápidamente a tus herramientas principales:
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+          {/* Recorridos */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('recorridos'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '20px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#3b82f6'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ backgroundColor: '#3b82f620', padding: '10px', borderRadius: '12px' }}>
+                <Map size={24} color="#3b82f6" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '18px', color: textPrimary, fontWeight: '700' }}>Recorridos</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '13px', color: textSecondary, lineHeight: '1.5' }}>
+              Visualiza tus rutas asignadas, gestiona los paquetes y marca entregas.
+            </p>
+          </div>
+
+          {/* Maps */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('maps'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '20px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#10b981'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ backgroundColor: '#10b98120', padding: '10px', borderRadius: '12px' }}>
+                <MapPin size={24} color="#10b981" />
+              </div>
+              <h3 style={{ margin: '0', fontSize: '18px', color: textPrimary, fontWeight: '700' }}>Maps</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '13px', color: textSecondary, lineHeight: '1.5' }}>
+              Ubica tu posición en el mapa interactivo y coordina con exactitud.
+            </p>
+          </div>
+
+          {/* Chat */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('chat'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '20px', padding: '24px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#8b5cf6'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ backgroundColor: '#8b5cf620', padding: '10px', borderRadius: '12px' }}>
+                <MessageCircle size={24} color="#8b5cf6" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '18px', color: textPrimary, fontWeight: '700' }}>Chat</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '13px', color: textSecondary, lineHeight: '1.5' }}>
+              Comunícate directo con la administración para reportar dudas.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: theme === 'light' ? '#f1f5f9' : '#0f172a', borderRadius: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: textSecondary, fontWeight: '500' }}>
+            <input
+              type="checkbox"
+              checked={noMostrar}
+              onChange={(e) => setNoMostrar(e.target.checked)}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            No mostrar este mensaje de bienvenida nuevamente
+          </label>
+          <button
+            onClick={handleClose}
+            style={{ padding: '10px 24px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2563eb'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#3b82f6'}
+          >
+            Entendido
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// PANTALLA: Dashboard
+// ════════════════════════════════════════════════════════════════
+function PantallaDashboard() {
+  const { colectas, choferes, clientes, theme, setCurrentPage, triggerTabSplash } = useContext(AppContext);
+  const { role, session } = useAuth();
+  const [colectasSabados, setColectasSabados] = useState([]);
+  const [tabDashboard, setTabDashboard] = useState('LUNES A VIERNES');
+  const [mostrarOverlay, setMostrarOverlay] = useState(false);
+
+  useEffect(() => {
+    // Si es coordinador, chequear si no le dio a "no mostrar"
+    if (role === 'coordinador') {
+      const email = session?.user?.email?.toLowerCase();
+      const oculto = localStorage.getItem(`ocultar_bienvenida_${email}`);
+      if (!oculto) {
+        setMostrarOverlay(true);
+      }
+    }
+  }, [role, session]);
+
+  useEffect(() => {
+    const fetchSabados = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('recorridos_sabados')
+          .select('*')
+          .order('orden', { ascending: true });
+        if (error) throw error;
+        setColectasSabados(data || []);
+      } catch (err) {
+        console.error('Error fetching sabados:', err);
+      }
+    };
+
+    // Carga inicial
+    fetchSabados();
+
+    // Realtime: re-fetch cuando cambie recorridos_sabados
+    const canalSabados = supabase
+      .channel('dashboard:recorridos_sabados')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'recorridos_sabados' },
+        (payload) => {
+          console.log('🔴 Realtime [dashboard:sabados]:', payload.eventType, payload);
+          fetchSabados();
+        }
+      )
+      .subscribe();
+
+    // Cleanup: cerrar canal al desmontar el Dashboard
+    return () => {
+      supabase.removeChannel(canalSabados);
+    };
+  }, []);
+
+  const clientesSemana = clientes.filter(c => c.tipo_dia !== 'SÁBADOS');
+  const clientesSabados = clientes.filter(c => c.tipo_dia === 'SÁBADOS');
+
+  // Lógica Dinámica
+  const datosActivos = tabDashboard === 'SÁBADOS' ? colectasSabados : colectas;
+  const totalPaquetes = datosActivos.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
+  const totalEntregados = datosActivos.reduce((s, c) => s + (c.entregados || 0), 0);
+  const pctGlobal = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : 0;
+  const rutasSinChoferActivas = datosActivos.filter(c => !c.idChofer || c.idChofer === 0);
+
+  const ZONAS = ['ZONA OESTE', 'ZONA SUR', 'ZONA NORTE', 'CABA'];
+  const coloresZona = {
     'ZONA OESTE': '#3b82f6',
     'ZONA SUR': '#8b5cf6',
     'ZONA NORTE': '#ec4899',
     'CABA': '#06b6d4',
-};
+  };
 
-function getPctColor(pct) {
+  const cardBg = theme === 'light' ? '#ffffff' : '#1e293b';
+  const border = theme === 'light' ? '#e2e8f0' : '#334155';
+  const textPrimary = theme === 'light' ? '#1e293b' : '#f8fafc';
+  const textSecondary = theme === 'light' ? '#64748b' : '#94a3b8';
+  const pageBg = theme === 'light' ? '#f8fafc' : '#020617';
+
+  const getPctColor = (pct) => {
     const n = parseFloat(pct);
     if (n >= 100) return '#10b981';
     if (n >= 80) return '#06b6d4';
     if (n >= 50) return '#f59e0b';
     return '#ef4444';
-}
+  };
 
-export function PantallaDashboard() {
-    const { colectas, choferes, clientes, theme, setCurrentPage, setShowSplash } = useContext(AppContext);
-    const [colectasSabados, setColectasSabados] = useState([]);
-    const [tabDashboard, setTabDashboard] = useState('LUNES A VIERNES');
-    const [choferesActivos, setChoferesActivos] = useState(0);
-    const [historialSemana, setHistorialSemana] = useState([]);
+  return (
+    <div style={{ padding: '24px', backgroundColor: pageBg, minHeight: '100vh', position: 'relative' }}>
 
-    const isDark = theme === 'dark';
-    const cardBg = isDark ? '#1e293b' : '#ffffff';
-    const pageBg = isDark ? '#020617' : '#f1f5f9';
-    const border = isDark ? '#334155' : '#e2e8f0';
-    const text1 = isDark ? '#f1f5f9' : '#0f172a';
-    const text2 = isDark ? '#94a3b8' : '#64748b';
-    const raisedBg = isDark ? '#0f172a' : '#f8fafc';
+      {/* OVERLAY DE BIENVENIDA (SOLO PARA COORDINADORES) */}
+      {mostrarOverlay && (
+        <OverlayBienvenidaChofer onClose={() => setMostrarOverlay(false)} />
+      )}
 
-    // ── Cargar datos ─────────────────────────────────────────────
-    useEffect(() => {
-        const fetchSabados = async () => {
-            const { data } = await supabase.from('recorridos_sabados').select('*').order('orden', { ascending: true });
-            setColectasSabados(data || []);
-        };
-        fetchSabados();
+      {/* TÍTULO */}
+      <div style={{ marginBottom: '28px' }}>
+        <h1 style={{ margin: 0, fontSize: '28px', fontWeight: '700', color: textPrimary }}>
+          📊 Dashboard
+        </h1>
+        <p style={{ margin: '4px 0 0', fontSize: '14px', color: textSecondary }}>
+          Resumen del día — {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
+      </div>
 
-        const canal = supabase.channel('dashboard:sabados')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'recorridos_sabados' }, fetchSabados)
-            .subscribe();
-        return () => supabase.removeChannel(canal);
-    }, []);
+      {/* TABS DASHBOARD */}
+      <div className="flex gap-2 mb-6">
+        {[
+          { label: 'LUNES A VIERNES', value: 'LUNES A VIERNES' },
+          { label: 'SÁBADOS', value: 'SÁBADOS' }
+        ].map(tab => (
+          <button
+            key={tab.value}
+            onClick={() => {
+              if (tabDashboard !== tab.value) {
+                triggerTabSplash(tab.label);
+                setTabDashboard(tab.value);
+              }
+            }}
+            className="px-4 py-2 rounded-t-lg font-semibold text-sm transition-all duration-100 border-b-2 focus:outline-none"
+            style={tabDashboard === tab.value
+              ? { background: 'var(--bg-raised)', borderColor: 'var(--brand-blue)', color: 'var(--brand-blue)' }
+              : { background: 'var(--bg-hover)', borderColor: 'transparent', color: 'var(--text-3)' }
+            }
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-    // ── Choferes activos (última actualización < 30 min) ─────────
-    useEffect(() => {
-        const calcActivos = () => {
-            const ahora = Date.now();
-            const activos = choferes.filter(c => {
-                if (!c.ultima_actualizacion) return false;
-                const diff = (ahora - new Date(c.ultima_actualizacion).getTime()) / 60000;
-                return diff < 30;
-            }).length;
-            setChoferesActivos(activos);
-        };
-        calcActivos();
-        const int = setInterval(calcActivos, 30000);
-        return () => clearInterval(int);
-    }, [choferes]);
+      {/* BLOQUE DINÁMICO */}
+      <div style={{ borderBottom: `2px solid ${border}`, paddingBottom: '8px', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', letterSpacing: '1px' }}>
+          📅 {tabDashboard}
+        </h2>
+      </div>
 
-    // ── Historial últimos 7 días para el gráfico ─────────────────
-    useEffect(() => {
-        const fetchHistorial = async () => {
-            try {
-                const hace7 = new Date();
-                hace7.setDate(hace7.getDate() - 6);
-                const { data } = await supabase
-                    .from('historial_recorridos')
-                    .select('fecha, entregados, pqte_dia, por_fuera')
-                    .gte('fecha', hace7.toISOString().split('T')[0])
-                    .order('fecha', { ascending: true });
-
-                if (!data) return;
-
-                // Agrupar por fecha
-                const porFecha = {};
-                data.forEach(r => {
-                    if (!porFecha[r.fecha]) porFecha[r.fecha] = { entregados: 0, total: 0 };
-                    porFecha[r.fecha].entregados += r.entregados || 0;
-                    porFecha[r.fecha].total += (r.pqte_dia || 0) + (r.por_fuera || 0);
-                });
-
-                // Rellenar los 7 días aunque no haya data
-                const dias = [];
-                for (let i = 6; i >= 0; i--) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i);
-                    const key = d.toISOString().split('T')[0];
-                    const label = d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' });
-                    dias.push({ key, label, ...(porFecha[key] || { entregados: 0, total: 0 }) });
-                }
-                setHistorialSemana(dias);
-            } catch (e) { }
-        };
-        fetchHistorial();
-    }, []);
-
-    // ── Métricas ─────────────────────────────────────────────────
-    const datosActivos = tabDashboard === 'SÁBADOS' ? colectasSabados : colectas;
-    const totalPaquetes = datosActivos.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
-    const totalEntregados = datosActivos.reduce((s, c) => s + (c.entregados || 0) + (c.entregadosFuera || 0), 0);
-    const pctGlobal = totalPaquetes > 0 ? ((totalEntregados / totalPaquetes) * 100).toFixed(1) : 0;
-    const rutasSinChofer = datosActivos.filter(c => !c.idChofer || c.idChofer === 0);
-    const clientesSemana = clientes.filter(c => c.tipo_dia !== 'SÁBADOS');
-    const clientesSabados = clientes.filter(c => c.tipo_dia === 'SÁBADOS');
-
-    const maxHistorial = useMemo(() => Math.max(...historialSemana.map(d => d.total), 1), [historialSemana]);
-
-    const statCards = [
-        {
-            label: 'Paquetes hoy',
-            value: totalPaquetes,
-            icon: Package,
-            color: '#3b82f6',
-            sub: `${totalEntregados} entregados`,
-        },
-        {
-            label: 'Completado',
-            value: pctGlobal + '%',
-            icon: TrendingUp,
-            color: getPctColor(pctGlobal),
-            sub: tabDashboard,
-        },
-        {
-            label: 'Choferes en ruta',
-            value: choferesActivos,
-            icon: Truck,
-            color: '#10b981',
-            sub: `de ${choferes.length} totales`,
-            live: true,
-        },
-        {
-            label: 'Clientes',
-            value: tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length,
-            icon: Users,
-            color: '#f59e0b',
-            sub: tabDashboard === 'SÁBADOS' ? 'Sábados' : 'Lunes a Viernes',
-        },
-    ];
-
-    return (
-        <div style={{ padding: '24px', backgroundColor: pageBg, minHeight: '100vh' }}>
-            <style>{`
-        @keyframes livePulse {
-          0%,100% { opacity:1; transform:scale(1); }
-          50%      { opacity:0.5; transform:scale(0.85); }
-        }
-        .dash-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .dash-card:hover { transform: translateY(-3px); }
-        .zona-card { transition: transform 0.2s ease, box-shadow 0.2s ease; cursor: pointer; }
-        .zona-card:hover { transform: translateY(-2px); }
-        .bar-fill { transition: height 0.6s cubic-bezier(0.34,1.56,0.64,1); }
-      `}</style>
-
-            {/* Header */}
-            <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-                <div>
-                    <h1 style={{ margin: 0, fontSize: '24px', fontWeight: '800', color: text1, letterSpacing: '-0.5px' }}>
-                        Dashboard
-                    </h1>
-                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: text2 }}>
-                        {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                    </p>
-                </div>
-
-                {/* Tabs */}
-                <div style={{ display: 'flex', gap: '6px', background: raisedBg, border: `1px solid ${border}`, borderRadius: '12px', padding: '4px' }}>
-                    {['LUNES A VIERNES', 'SÁBADOS'].map(tab => (
-                        <button key={tab} onClick={() => {
-                            if (tabDashboard !== tab) {
-                                setShowSplash(true);
-                                setTabDashboard(tab);
-                                setTimeout(() => setShowSplash(false), 1200);
-                            }
-                        }} style={{
-                            padding: '6px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-                            fontSize: '13px', fontWeight: '700', transition: 'all 0.15s',
-                            background: tabDashboard === tab ? (isDark ? '#1e293b' : '#fff') : 'transparent',
-                            color: tabDashboard === tab ? '#3b82f6' : text2,
-                            boxShadow: tabDashboard === tab ? (isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.1)') : 'none',
-                        }}>
-                            {tab === 'LUNES A VIERNES' ? 'L-V' : 'Sábados'}
-                        </button>
-                    ))}
-                </div>
+      {/* CARDS GLOBALES */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+        {[
+          ...(tabDashboard === 'SÁBADOS' ? [
+            { label: 'Rutas activas', value: datosActivos.length, icon: '🗓️', color: '#06b6d4' }
+          ] : [
+            { label: 'Choferes activos', value: choferes.length, icon: '🚚', color: '#8b5cf6' }
+          ]),
+          { label: 'Total paquetes', value: totalPaquetes, icon: '📦', color: '#3b82f6' },
+          { label: 'Entregados', value: totalEntregados, icon: '✅', color: '#10b981' },
+          { label: '% Global', value: pctGlobal + '%', icon: '📈', color: getPctColor(pctGlobal) },
+          { label: 'Clientes activos', value: tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length, icon: tabDashboard === 'SÁBADOS' ? '🗓️' : '📅', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b' },
+          { label: 'Rutas sin chofer', value: rutasSinChoferActivas.length, icon: '⚠️', color: rutasSinChoferActivas.length > 0 ? '#ef4444' : '#10b981' }
+        ].map(card => (
+          <div key={card.label} style={{
+            backgroundColor: cardBg,
+            borderRadius: '12px',
+            border: `1px solid ${border}`,
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+            boxShadow: theme === 'light' ? '0 1px 3px rgba(0,0,0,0.07)' : '0 4px 12px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{ fontSize: '24px' }}>{card.icon}</div>
+            <div style={{ fontSize: '28px', fontWeight: '800', color: card.color, lineHeight: 1 }}>
+              {card.value}
             </div>
-
-            {/* Stat cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '24px' }}>
-                {statCards.map(card => {
-                    const Icon = card.icon;
-                    return (
-                        <div key={card.label} className="dash-card" style={{
-                            background: cardBg, border: `1px solid ${border}`,
-                            borderRadius: '16px', padding: '20px',
-                            boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.06)',
-                            position: 'relative', overflow: 'hidden',
-                        }}>
-                            {/* Accent top */}
-                            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '3px', background: card.color, borderRadius: '16px 16px 0 0' }} />
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: `${card.color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    <Icon size={20} color={card.color} />
-                                </div>
-                                {card.live && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                        <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'livePulse 1.5s ease-in-out infinite' }} />
-                                        <span style={{ fontSize: '10px', color: '#10b981', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Live</span>
-                                    </div>
-                                )}
-                            </div>
-                            <div style={{ fontSize: '32px', fontWeight: '800', color: card.color, lineHeight: 1, marginBottom: '4px' }}>
-                                {card.value}
-                            </div>
-                            <div style={{ fontSize: '13px', fontWeight: '700', color: text1, marginBottom: '2px' }}>{card.label}</div>
-                            <div style={{ fontSize: '11px', color: text2 }}>{card.sub}</div>
-                        </div>
-                    );
-                })}
+            <div style={{ fontSize: '12px', fontWeight: '600', color: textSecondary, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              {card.label}
             </div>
+          </div>
+        ))}
+      </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
-
-                {/* Gráfico semanal */}
-                <div style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: '16px', padding: '20px', boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.06)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                        <BarChart2 size={18} color="#3b82f6" />
-                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: text1 }}>Entregas últimos 7 días</h3>
-                    </div>
-                    {historialSemana.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '32px 0', color: text2, fontSize: '13px' }}>Sin datos de historial aún</div>
-                    ) : (
-                        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '120px' }}>
-                            {historialSemana.map((dia, i) => {
-                                const pct = dia.total > 0 ? (dia.entregados / dia.total) : 0;
-                                const heightPct = dia.total > 0 ? Math.max((dia.total / maxHistorial) * 100, 6) : 4;
-                                const isHoy = i === historialSemana.length - 1;
-                                return (
-                                    <div key={dia.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px', height: '100%', justifyContent: 'flex-end' }} title={`${dia.entregados}/${dia.total} paquetes`}>
-                                        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: `${heightPct}%`, position: 'relative' }}>
-                                            {/* Barra total */}
-                                            <div className="bar-fill" style={{ width: '100%', height: '100%', borderRadius: '6px 6px 0 0', background: isDark ? '#1e293b' : '#e2e8f0', position: 'relative', overflow: 'hidden' }}>
-                                                {/* Barra entregados */}
-                                                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: `${pct * 100}%`, background: isHoy ? '#3b82f6' : getPctColor(pct * 100), borderRadius: '6px 6px 0 0', transition: 'height 0.6s ease' }} />
-                                            </div>
-                                        </div>
-                                        <span style={{ fontSize: '10px', color: isHoy ? '#3b82f6' : text2, fontWeight: isHoy ? '700' : '500', textAlign: 'center', lineHeight: 1.2 }}>{dia.label}</span>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    {/* Leyenda */}
-                    <div style={{ display: 'flex', gap: '16px', marginTop: '14px', paddingTop: '12px', borderTop: `1px solid ${border}` }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#10b981' }} />
-                            <span style={{ fontSize: '11px', color: text2 }}>100%</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#f59e0b' }} />
-                            <span style={{ fontSize: '11px', color: text2 }}>50–80%</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#ef4444' }} />
-                            <span style={{ fontSize: '11px', color: text2 }}>&lt;50%</span>
-                        </div>
-                    </div>
+      {/* RESUMEN POR ZONA DINÁMICO */}
+      <div style={{ marginBottom: '28px' }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '700', color: textPrimary }}>
+          Resumen por zona
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+          {ZONAS.map(zona => {
+            const items = datosActivos.filter(c => c.zona === zona);
+            const pqtes = items.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
+            const entregados = items.reduce((s, c) => s + (c.entregados || 0), 0);
+            const pct = pqtes > 0 ? ((entregados / pqtes) * 100).toFixed(1) : 0;
+            const color = coloresZona[zona];
+            const sinChofer = items.filter(c => !c.idChofer || c.idChofer === 0).length;
+            return (
+              <div
+                key={zona}
+                onClick={() => setCurrentPage('recorridos')}
+                style={{
+                  backgroundColor: cardBg,
+                  borderRadius: '10px',
+                  border: `1px solid ${border}`,
+                  borderLeft: `4px solid ${color}`,
+                  padding: '16px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${color}25`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color, textTransform: 'uppercase' }}>{zona}</span>
+                  <span style={{ fontSize: '20px', fontWeight: '800', color: getPctColor(pct) }}>{pct}%</span>
                 </div>
-
-                {/* Choferes en ruta ahora */}
-                <div style={{ background: cardBg, border: `1px solid ${border}`, borderRadius: '16px', padding: '20px', boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.06)', display: 'flex', flexDirection: 'column' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Activity size={18} color="#10b981" />
-                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: text1 }}>En ruta ahora</h3>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10b981', animation: 'livePulse 1.5s ease-in-out infinite' }} />
-                            <span style={{ fontSize: '11px', color: '#10b981', fontWeight: '700' }}>LIVE</span>
-                        </div>
-                    </div>
-                    <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {choferes
-                            .filter(c => c.ultima_actualizacion && (Date.now() - new Date(c.ultima_actualizacion).getTime()) / 60000 < 30)
-                            .slice(0, 6)
-                            .map(c => {
-                                const diffMin = Math.floor((Date.now() - new Date(c.ultima_actualizacion).getTime()) / 60000);
-                                const zColor = ZONA_COLORS[c.zona] || '#64748b';
-                                return (
-                                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px', borderRadius: '10px', background: raisedBg, border: `1px solid ${border}` }}>
-                                        <div style={{ width: '34px', height: '34px', borderRadius: '8px', background: `${zColor}18`, border: `1.5px solid ${zColor}35`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                            <Truck size={15} color={zColor} />
-                                        </div>
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <p style={{ margin: 0, fontSize: '13px', fontWeight: '700', color: text1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</p>
-                                            <p style={{ margin: 0, fontSize: '11px', color: text2 }}>{c.zona || 'Sin zona'}</p>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '3px', flexShrink: 0 }}>
-                                            <Clock size={11} color={text2} />
-                                            <span style={{ fontSize: '11px', color: text2 }}>{diffMin}m</span>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        {choferesActivos === 0 && (
-                            <div style={{ textAlign: 'center', padding: '24px 0', color: text2, fontSize: '13px' }}>
-                                <Truck size={28} style={{ margin: '0 auto 8px', display: 'block', opacity: 0.2, color: text2 }} />
-                                Sin choferes activos en este momento
-                            </div>
-                        )}
-                    </div>
+                <div style={{ height: '6px', borderRadius: '3px', backgroundColor: theme === 'light' ? '#e2e8f0' : '#334155', marginBottom: '10px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, backgroundColor: getPctColor(pct), borderRadius: '3px', transition: 'width 0.5s ease' }} />
                 </div>
-            </div>
-
-            {/* Resumen por zona */}
-            <div style={{ marginBottom: '24px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                    <h2 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: text1 }}>Resumen por zona</h2>
-                    <button onClick={() => setCurrentPage('recorridos')} style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'none', border: 'none', color: '#3b82f6', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                        Ver recorridos <ArrowRight size={14} />
-                    </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: textSecondary }}>
+                  <span>{entregados}/{pqtes} pqtes</span>
+                  <span>{items.length} rutas</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                    {ZONAS.map(zona => {
-                        const items = datosActivos.filter(c => c.zona === zona);
-                        const pqtes = items.reduce((s, c) => s + (c.pqteDia || 0) + (c.porFuera || 0), 0);
-                        const entregados = items.reduce((s, c) => s + (c.entregados || 0) + (c.entregadosFuera || 0), 0);
-                        const pct = pqtes > 0 ? ((entregados / pqtes) * 100).toFixed(1) : 0;
-                        const color = ZONA_COLORS[zona];
-                        const sinChofer = items.filter(c => !c.idChofer || c.idChofer === 0).length;
-                        return (
-                            <div key={zona} className="zona-card" onClick={() => setCurrentPage('recorridos')} style={{
-                                background: cardBg, border: `1px solid ${border}`,
-                                borderLeft: `4px solid ${color}`, borderRadius: '12px', padding: '16px',
-                                boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.05)',
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: '800', color, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{zona}</span>
-                                    <span style={{ fontSize: '22px', fontWeight: '800', color: getPctColor(pct) }}>{pct}%</span>
-                                </div>
-                                <div style={{ height: '5px', borderRadius: '3px', background: isDark ? '#334155' : '#e2e8f0', marginBottom: '10px', overflow: 'hidden' }}>
-                                    <div style={{ height: '100%', width: `${Math.min(pct, 100)}%`, background: getPctColor(pct), borderRadius: '3px', transition: 'width 0.6s ease' }} />
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: text2 }}>
-                                    <span>{entregados}/{pqtes} pqtes</span>
-                                    <span>{items.length} rutas</span>
-                                </div>
-                                {sinChofer > 0 && (
-                                    <div style={{ marginTop: '8px', fontSize: '11px', color: '#ef4444', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <AlertTriangle size={11} /> {sinChofer} sin chofer
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-
-            {/* Alerta rutas sin chofer */}
-            {rutasSinChofer.length > 0 && (
-                <div style={{ background: isDark ? 'rgba(239,68,68,0.08)' : '#fef2f2', border: '1px solid rgba(239,68,68,0.25)', borderLeft: '4px solid #ef4444', borderRadius: '12px', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <AlertTriangle size={18} color="#ef4444" />
-                        <div>
-                            <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#ef4444' }}>
-                                {rutasSinChofer.length} ruta{rutasSinChofer.length > 1 ? 's' : ''} sin chofer asignado
-                            </p>
-                            <p style={{ margin: '2px 0 0', fontSize: '12px', color: text2 }}>
-                                {rutasSinChofer.slice(0, 4).map(r => r.localidad).join(', ')}{rutasSinChofer.length > 4 ? ` y ${rutasSinChofer.length - 4} más` : ''}
-                            </p>
-                        </div>
-                    </div>
-                    <button onClick={() => setCurrentPage('recorridos')} style={{ display: 'flex', alignItems: 'center', gap: '5px', background: 'none', border: '1px solid rgba(239,68,68,0.4)', color: '#ef4444', borderRadius: '8px', padding: '6px 14px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
-                        Ir a Recorridos <ArrowRight size={13} />
-                    </button>
-                </div>
-            )}
+                {sinChofer > 0 && (
+                  <div style={{ marginTop: '8px', fontSize: '11px', color: '#ef4444', fontWeight: '600' }}>
+                    ⚠️ {sinChofer} ruta{sinChofer > 1 ? 's' : ''} sin chofer
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
-    );
+      </div>
+
+
+      {/* CLIENTES ACTIVOS ESE DÍA */}
+      <div style={{ marginBottom: '28px' }}>
+        <h2 style={{ margin: '0 0 16px', fontSize: '18px', fontWeight: '700', color: textPrimary }}>
+          Clientes registrados ({tabDashboard})
+        </h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+          <div
+            onClick={() => setCurrentPage('clientes')}
+            style={{
+              backgroundColor: cardBg,
+              borderRadius: '10px',
+              border: `1px solid ${border}`,
+              borderLeft: `4px solid ${tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b'}`,
+              padding: '16px',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 8px 20px ${tabDashboard === 'SÁBADOS' ? 'rgba(6,182,212,0.2)' : 'rgba(245,158,11,0.2)'}`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', textTransform: 'uppercase' }}>
+                {tabDashboard === 'SÁBADOS' ? '🗓️ Sábados' : '📅 Lunes a Viernes'}
+              </span>
+              <span style={{ fontSize: '26px', fontWeight: '800', color: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b' }}>
+                {tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length}
+              </span>
+            </div>
+            <div style={{ height: '6px', borderRadius: '3px', backgroundColor: theme === 'light' ? '#e2e8f0' : '#334155', marginBottom: '10px', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: clientes.length > 0 ? `${((tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length) / clientes.length) * 100}%` : '0%', backgroundColor: tabDashboard === 'SÁBADOS' ? '#06b6d4' : '#f59e0b', borderRadius: '3px', transition: 'width 0.5s ease' }} />
+            </div>
+            <div style={{ fontSize: '12px', color: textSecondary }}>
+              {clientes.length > 0 ? (((tabDashboard === 'SÁBADOS' ? clientesSabados.length : clientesSemana.length) / clientes.length) * 100).toFixed(0) : 0}% del padrón total de clientes
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ALERTAS */}
+      {rutasSinChoferActivas.length > 0 && (
+        <div style={{
+          backgroundColor: theme === 'light' ? '#fef2f2' : '#2d1515',
+          border: `1px solid #ef444440`,
+          borderLeft: '4px solid #ef4444',
+          borderRadius: '10px',
+          padding: '16px 20px',
+          marginBottom: '20px',
+        }}>
+          <p style={{ margin: 0, fontSize: '14px', fontWeight: '700', color: '#ef4444' }}>
+            ⚠️ {rutasSinChoferActivas.length} ruta{rutasSinChoferActivas.length > 1 ? 's' : ''} sin chofer asignado ({tabDashboard})
+          </p>
+          <p style={{ margin: '4px 0 8px', fontSize: '13px', color: textSecondary }}>
+            {rutasSinChoferActivas.map(r => r.localidad).join(', ')}
+          </p>
+          <button
+            onClick={() => setCurrentPage('recorridos')}
+            style={{ fontSize: '12px', fontWeight: '600', color: '#ef4444', background: 'none', border: '1px solid #ef444460', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer' }}
+          >
+            Ir a Recorridos →
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
+
+
+export { PantallaDashboard };

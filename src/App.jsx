@@ -2,29 +2,11 @@ import { useState, useEffect, useCallback, useMemo, createContext, useRef, useCo
 import { supabase } from './supabase';
 import './index.css';
 import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, X, Users, History, Shield, LayoutDashboard, Smartphone } from 'lucide-react';
-import { DashboardSabados } from './components/DashboardSabados';
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 import { ModalAgregar } from './components/ModalAgregar';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { ModalAgregarChofer } from './components/ModalAgregarChofer';
-import { ModalConfirmarEliminar } from './components/ModalConfirmarEliminar';
 import { ModalAgregarCliente } from './components/ModalAgregarCliente';
 import { TarjetaChofer } from './components/TarjetaChofer';
 import { useAuth } from './components/AuthContext';

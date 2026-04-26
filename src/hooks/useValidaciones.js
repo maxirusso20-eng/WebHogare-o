@@ -1,3 +1,16 @@
+/**
+ * ⚠️ ARCHIVO DISPONIBLE PERO NO INTEGRADO (TODO)
+ *
+ * Este archivo contiene utilidades genéricas (Formateo, Zonas, WhatsApp, Fecha,
+ * LocalStorage, Seguridad) cuya lógica actualmente está duplicada en múltiples
+ * componentes:
+ *   - Zonas hardcodeadas en PantallaRecorridos.jsx, PantallaDashboard.jsx y Modales.
+ *   - URLs de wa.me/ hardcodeadas en TarjetaChofer.jsx y PantallaClientes.jsx.
+ *   - toLocaleDateString('es-AR') duplicado en 9+ archivos.
+ *
+ * Pendiente: refactorizar los componentes para que importen de aquí en lugar
+ * de tener la lógica duplicada.
+ */
 import { useState, useCallback } from 'react';
 
 /**

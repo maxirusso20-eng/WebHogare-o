@@ -30,3 +30,7 @@ dist-ssr
 .vite/
 eslint_out.txt
 worktrees/
+
+# Lint outputs
+lint.json
+lint_output*.txt

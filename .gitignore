@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Required ignores
+.env
+.env.local
+.env.*.local
+.vite/
+eslint_out.txt
+worktrees/

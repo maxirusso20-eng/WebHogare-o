@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { AppContext } from '../App';
 import { supabase } from '../supabase';
 import { useAuth } from './AuthContext';
-import { X, Map, MapPin, MessageCircle } from 'lucide-react';
+import { X, Map, MapPin, MessageCircle, Users, Truck, History, Shield, LayoutDashboard } from 'lucide-react';
 
 function OverlayBienvenidaChofer({ onClose }) {
   const { theme, choferes, setCurrentPage } = useContext(AppContext);
@@ -137,6 +137,231 @@ function OverlayBienvenidaChofer({ onClose }) {
 }
 
 // ════════════════════════════════════════════════════════════════
+// PANTALLA: Overlay Bienvenida Administrador
+// ════════════════════════════════════════════════════════════════
+function OverlayBienvenidaAdmin({ onClose }) {
+  const { theme, setCurrentPage } = useContext(AppContext);
+  const { session } = useAuth();
+  const [noMostrar, setNoMostrar] = useState(false);
+
+  const miEmail = session?.user?.email?.toLowerCase();
+  const nombre = miEmail ? miEmail.split('@')[0] : 'Administrador';
+
+  const cardBg = theme === 'light' ? '#ffffff' : '#1e293b';
+  const border = theme === 'light' ? '#e2e8f0' : '#334155';
+  const textPrimary = theme === 'light' ? '#1e293b' : '#f8fafc';
+  const textSecondary = theme === 'light' ? '#64748b' : '#94a3b8';
+
+  const handleClose = () => {
+    if (noMostrar) {
+      localStorage.setItem(`ocultar_bienvenida_admin_${miEmail}`, 'true');
+    }
+    onClose();
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 999999,
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      background: theme === 'dark' ? 'rgba(2, 6, 23, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+      backdropFilter: 'blur(16px)',
+      animation: 'fadeIn 0.3s ease-out forwards',
+      padding: '24px'
+    }}>
+      <div style={{ position: 'relative', background: cardBg, padding: '40px', borderRadius: '32px', boxShadow: theme === 'dark' ? '0 20px 40px rgba(0,0,0,0.5)' : '0 20px 40px rgba(59,130,246,0.15)', border: `1px solid ${border}`, maxWidth: '1000px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+
+        <button
+          onClick={handleClose}
+          style={{ position: 'absolute', top: '24px', right: '24px', background: 'transparent', border: 'none', cursor: 'pointer', color: textSecondary, padding: '8px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}
+          onMouseEnter={e => e.currentTarget.style.background = theme === 'dark' ? '#334155' : '#f1f5f9'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <X size={24} />
+        </button>
+
+        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
+          <div style={{ fontSize: '56px', marginBottom: '12px', animation: 'bounceFloat 2s infinite' }}>👑</div>
+          <h1 style={{ fontSize: '32px', fontWeight: '800', color: textPrimary, marginBottom: '8px', letterSpacing: '-0.5px' }}>
+            ¡Bienvenido, <span style={{ color: '#3b82f6' }}>{nombre}</span>!
+          </h1>
+          <p style={{ fontSize: '15px', color: textSecondary, lineHeight: '1.6', maxWidth: '700px', margin: '0 auto' }}>
+            Este es tu Panel de Control de Administrador. Desde aquí tienes control total sobre la logística de tu negocio. Conoce las secciones clave:
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '30px' }}>
+          
+          {/* Dashboard */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('dashboard'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#0ea5e9'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#0ea5e920', padding: '8px', borderRadius: '10px' }}>
+                <LayoutDashboard size={20} color="#0ea5e9" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Dashboard</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Vista principal con el resumen general de las operaciones del día.
+            </p>
+          </div>
+
+          {/* Choferes */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('choferes'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#8b5cf6'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#8b5cf620', padding: '8px', borderRadius: '10px' }}>
+                <Truck size={20} color="#8b5cf6" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Choferes</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Administra tu flota, zonas asignadas y datos de contacto del personal.
+            </p>
+          </div>
+
+          {/* Clientes */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('clientes'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#f59e0b'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#f59e0b20', padding: '8px', borderRadius: '10px' }}>
+                <Users size={20} color="#f59e0b" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Clientes</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Organiza la cartera de clientes, horarios y asignación de colectas.
+            </p>
+          </div>
+
+          {/* Recorridos */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('recorridos'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#3b82f6'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#3b82f620', padding: '8px', borderRadius: '10px' }}>
+                <Map size={20} color="#3b82f6" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Recorridos</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Diseña las rutas del día y monitorea los paquetes en tiempo real.
+            </p>
+          </div>
+
+          {/* Maps */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('maps'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#10b981'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#10b98120', padding: '8px', borderRadius: '10px' }}>
+                <MapPin size={20} color="#10b981" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Live Maps</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Supervisa la ubicación en vivo de todos tus choferes coordinados.
+            </p>
+          </div>
+
+          {/* Chat */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('chat'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#ec4899'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#ec489920', padding: '8px', borderRadius: '10px' }}>
+                <MessageCircle size={20} color="#ec4899" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Chat & Soporte</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Canal de comunicación directa para resolver dudas del personal.
+            </p>
+          </div>
+
+          {/* Roles */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('roles'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#6366f1'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#6366f120', padding: '8px', borderRadius: '10px' }}>
+                <Shield size={20} color="#6366f1" />
+              </div>
+              <h3 style={{ margin: 0, fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Roles y Accesos</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Controla qué nivel de acceso tiene cada usuario del sistema.
+            </p>
+          </div>
+
+          {/* Historiales */}
+          <div
+            onClick={() => { handleClose(); setCurrentPage('historial-recorridos'); }}
+            style={{ backgroundColor: theme === 'light' ? '#f8fafc' : '#0f172a', border: `1px solid ${border}`, borderRadius: '16px', padding: '16px', cursor: 'pointer', transition: 'all 0.2s' }}
+            onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.borderColor = '#64748b'; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.borderColor = border; }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ backgroundColor: '#64748b20', padding: '8px', borderRadius: '10px' }}>
+                <History size={20} color="#64748b" />
+              </div>
+              <h3 style={{ margin: '0', fontSize: '15px', color: textPrimary, fontWeight: '700' }}>Auditoría Histórica</h3>
+            </div>
+            <p style={{ margin: 0, fontSize: '12px', color: textSecondary, lineHeight: '1.4' }}>
+              Revisa estadísticas y métricas de operaciones de días anteriores.
+            </p>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', backgroundColor: theme === 'light' ? '#f1f5f9' : '#0f172a', borderRadius: '12px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '14px', color: textSecondary, fontWeight: '500' }}>
+            <input
+              type="checkbox"
+              checked={noMostrar}
+              onChange={(e) => setNoMostrar(e.target.checked)}
+              style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+            />
+            No mostrar este mensaje de bienvenida nuevamente
+          </label>
+          <button
+            onClick={handleClose}
+            style={{ padding: '10px 24px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', fontWeight: '700', cursor: 'pointer', transition: 'background 0.2s' }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2563eb'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#3b82f6'}
+          >
+            Empezar a Administrar
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
 // PANTALLA: Dashboard
 // ════════════════════════════════════════════════════════════════
 function PantallaDashboard() {
@@ -144,15 +369,24 @@ function PantallaDashboard() {
   const { role, session } = useAuth();
   const [colectasSabados, setColectasSabados] = useState([]);
   const [tabDashboard, setTabDashboard] = useState('LUNES A VIERNES');
-  const [mostrarOverlay, setMostrarOverlay] = useState(false);
+  const [mostrarOverlayChofer, setMostrarOverlayChofer] = useState(false);
+  const [mostrarOverlayAdmin, setMostrarOverlayAdmin] = useState(false);
 
   useEffect(() => {
-    // Si es coordinador, chequear si no le dio a "no mostrar"
+    const email = session?.user?.email?.toLowerCase();
+    
+    // Check para coordinador
     if (role === 'coordinador') {
-      const email = session?.user?.email?.toLowerCase();
       const oculto = localStorage.getItem(`ocultar_bienvenida_${email}`);
       if (!oculto) {
-        setMostrarOverlay(true);
+        setMostrarOverlayChofer(true);
+      }
+    } 
+    // Check para admin o subadmin
+    else if (['admin', 'subadmin'].includes(role)) {
+      const oculto = localStorage.getItem(`ocultar_bienvenida_admin_${email}`);
+      if (!oculto) {
+        setMostrarOverlayAdmin(true);
       }
     }
   }, [role, session]);
@@ -228,9 +462,14 @@ function PantallaDashboard() {
   return (
     <div style={{ padding: '24px', backgroundColor: pageBg, minHeight: '100vh', position: 'relative' }}>
 
-      {/* OVERLAY DE BIENVENIDA (SOLO PARA COORDINADORES) */}
-      {mostrarOverlay && (
-        <OverlayBienvenidaChofer onClose={() => setMostrarOverlay(false)} />
+      {/* OVERLAY DE BIENVENIDA (COORDINADOR) */}
+      {mostrarOverlayChofer && (
+        <OverlayBienvenidaChofer onClose={() => setMostrarOverlayChofer(false)} />
+      )}
+
+      {/* OVERLAY DE BIENVENIDA (ADMIN) */}
+      {mostrarOverlayAdmin && (
+        <OverlayBienvenidaAdmin onClose={() => setMostrarOverlayAdmin(false)} />
       )}
 
       {/* TÍTULO */}

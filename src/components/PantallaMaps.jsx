@@ -13,6 +13,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../supabase';
 import { AppContext } from '../App';
+import { useAuth } from './AuthContext';
 
 // ── Los estilos del mapa (pulseGPS, spin, .icono-camion, etc.) viven
 // ── en index.css — no se inyectan dinámicamente para no crear capas extra.
@@ -256,6 +257,7 @@ const ChoferItem = memo(({ chofer, esSeleccionado, onClick }) => {
 // ──────────────────────────────────────────────────────────────────
 export function PantallaMaps() {
   const { theme } = useContext(AppContext);
+  const { role, session } = useAuth();
   const isDark = theme === 'dark';
 
   // ── Estado choferes
@@ -280,6 +282,8 @@ export function PantallaMaps() {
   const [limpiandoMapa, setLimpiandoMapa] = useState(false);
   const [confirmLimpiar, setConfirmLimpiar] = useState(false);
 
+  const [initialZoomDone, setInitialZoomDone] = useState(false);
+
   // Temporizador para re-renderizar indicadores de tiempo cada 30s
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -299,7 +303,7 @@ export function PantallaMaps() {
     try {
       const { data, error } = await supabase
         .from('Choferes')
-        .select('id, nombre, condicion, zona, latitud, longitud, ultima_actualizacion')
+        .select('id, nombre, condicion, zona, latitud, longitud, ultima_actualizacion, email')
         .order('orden', { ascending: true, nullsFirst: false });
       if (error) throw error;
       setChoferes(data || []);
@@ -332,7 +336,7 @@ export function PantallaMaps() {
     try {
       const { data, error } = await supabase
         .from('Choferes')
-        .select('id, nombre, condicion, zona, latitud, longitud, ultima_actualizacion')
+        .select('id, nombre, condicion, zona, latitud, longitud, ultima_actualizacion, email')
         .order('orden', { ascending: true, nullsFirst: false });
       if (error) throw error;
       setChoferes(data || []);
@@ -452,6 +456,18 @@ export function PantallaMaps() {
     choferes.filter(c => c.latitud != null && c.longitud != null),
     [choferes]
   );
+
+  useEffect(() => {
+    if (role === 'coordinador' && !initialZoomDone && choferesConGPS.length > 0) {
+      const miEmail = session?.user?.email?.toLowerCase();
+      const myChofer = choferesConGPS.find(c => c.email?.toLowerCase() === miEmail);
+      if (myChofer) {
+        setFlyTarget({ latitud: myChofer.latitud, longitud: myChofer.longitud });
+        setChoferSeleccionado(myChofer);
+        setInitialZoomDone(true);
+      }
+    }
+  }, [choferesConGPS, role, session, initialZoomDone]);
 
   const choferesFiltrados = useMemo(() => {
     if (!busqueda.trim()) return choferes;

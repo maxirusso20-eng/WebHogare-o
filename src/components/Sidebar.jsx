@@ -73,6 +73,23 @@ export function Sidebar({
           const visto = isAd ? m.visto_admin : m.visto_chofer;
           if (!visto) {
             setUnreadChatCount(prev => prev + 1);
+            
+            // ── ALERTA SONORA (Sintetizada) ──
+            try {
+              const ctx = new (window.AudioContext || window.webkitAudioContext)();
+              const osc = ctx.createOscillator();
+              const gain = ctx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+              osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.1);
+              gain.gain.setValueAtTime(0.5, ctx.currentTime);
+              gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+              osc.start();
+              osc.stop(ctx.currentTime + 0.5);
+            } catch(e) {}
+
             if (Notification.permission === 'granted') {
               new Notification('Nuevo mensaje', {
                 body: `${m.remitente || 'Alguien'}: ${m.texto ? m.texto : 'Mensaje adjunto'}`,
@@ -113,7 +130,10 @@ export function Sidebar({
       ? 'drop-shadow(0px 3px 2px rgba(0, 0, 0, 0.22))'
       : 'drop-shadow(0px 3px 3px rgba(0, 0, 0, 0.5))';
 
-  const handleLogout = () => supabase.auth.signOut();
+  const handleLogout = () => {
+    sessionStorage.clear();
+    supabase.auth.signOut();
+  };
 
   // ── MÓVIL ──────────────────────────────────────────────────────────────────
   if (isMobile) {

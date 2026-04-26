@@ -415,7 +415,6 @@ function PantallaDashboard() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'recorridos_sabados' },
         (payload) => {
-          console.log('🔴 Realtime [dashboard:sabados]:', payload.eventType, payload);
           fetchSabados();
         }
       )

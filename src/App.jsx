@@ -117,8 +117,6 @@ function App() {
           .order('cliente', { ascending: true });
 
         setClientes(clientesData || []);
-        console.log('Clientes cargados:', clientesData);
-        console.log('✓ Datos cargados desde Supabase');
       } catch (err) {
         console.error('Error cargando datos:', err);
         mostrarToast('Error cargando datos', 'error');
@@ -135,7 +133,6 @@ function App() {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'Choferes' },
         (payload) => {
-          console.log('🔄 Cambio en Choferes:', payload);
           if (payload.eventType === 'INSERT') {
             setChoferes(prev => [...prev, payload.new]);
           } else if (payload.eventType === 'UPDATE') {

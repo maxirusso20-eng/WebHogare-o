@@ -67,7 +67,6 @@ function PantallaRecorridos() {
         'postgres_changes',
         { event: '*', schema: 'public', table: tablaActual },
         (payload) => {
-          console.log(`🔴 Realtime [${tablaActual}]:`, payload.eventType, payload);
           // Re-fetch completo para mantener orden correcto desde BD
           fetchRecorridos();
         }
@@ -151,8 +150,6 @@ function PantallaRecorridos() {
         entregados: 0
       };
 
-      console.log('📤 Intentando insertar nueva ruta:', nuevaRuta);
-
       const { data, error, status } = await supabase
         .from(tablaActual)
         .insert([nuevaRuta])
@@ -167,7 +164,6 @@ function PantallaRecorridos() {
       }
 
       if (data && data[0]) {
-        console.log('✅ Inserción exitosa (status: ' + status + '):', data);
         setColectasLocales(prev => [...prev, data[0]]);
         mostrarToast(`✅ ${localidad} agregada correctamente a ${selectedZona}`, 'success');
         setIsModalOpen(false);

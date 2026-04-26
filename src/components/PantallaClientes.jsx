@@ -20,7 +20,6 @@ function PantallaClientes() {
 
   // Limpiar/refiltrar clientes al cambiar de pestaña
   useEffect(() => {
-    console.log('Pestaña activa:', tabActiva);
   }, [tabActiva]);
 
   // Cargar checks desde Supabase (hora_llegada de hoy)

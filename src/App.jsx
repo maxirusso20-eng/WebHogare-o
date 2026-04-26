@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, createContext, useRef, useContext } from 'react';
 import { supabase } from './supabase';
 import './index.css';
-import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, X, Users, History, Shield, LayoutDashboard } from 'lucide-react';
+import { Truck, Package, Plus, MapPin, Map, TrendingUp, AlertCircle, CheckCircle, Grid3x3, Trash2, GripVertical, CalendarDays, MessageCircle, X, Users, History, Shield, LayoutDashboard, Smartphone } from 'lucide-react';
 import { DashboardSabados } from './components/DashboardSabados';
 import {
   DndContext,
@@ -1210,6 +1210,9 @@ function PantallaRecorridos() {
   const [tabActiva, setTabActiva] = useState('LUNES A VIERNES');
   const [colectasLocales, setColectasLocales] = useState([]);
   const [loadingLocal, setLoadingLocal] = useState(true);
+  const [modoConductor, setModoConductor] = useState(false);
+  const [zonaAsigMasiva, setZonaAsigMasiva] = useState(null);
+  const [choferMasivo, setChoferMasivo] = useState('');
 
   // Tabla dinámica según la pestaña activa
   const tablaActual = tabActiva === 'SÁBADOS' ? 'recorridos_sabados' : 'Recorridos';
@@ -1471,16 +1474,32 @@ function PantallaRecorridos() {
             Gestión de Rutas y Paquetes
           </h1>
         </div>
-        <button
-          onClick={guardarEnHistorialRecorridos}
-          disabled={guardandoHistorial}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', backgroundColor: guardandoHistorial ? '#475569' : '#8b5cf6', color: 'white', borderRadius: '9px', fontWeight: '700', fontSize: '14px', border: 'none', cursor: guardandoHistorial ? 'not-allowed' : 'pointer', transition: 'background 120ms ease', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(139,92,246,0.25)' }}
-          onMouseEnter={e => { if (!guardandoHistorial) e.currentTarget.style.backgroundColor = '#7c3aed'; }}
-          onMouseLeave={e => { if (!guardandoHistorial) e.currentTarget.style.backgroundColor = '#8b5cf6'; }}
-        >
-          <CalendarDays size={16} />
-          {guardandoHistorial ? 'Guardando...' : 'Guardar en Historial'}
-        </button>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setModoConductor(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '9px 16px',
+              backgroundColor: modoConductor ? '#f59e0b' : (theme === 'light' ? '#f1f5f9' : '#1e293b'),
+              color: modoConductor ? '#fff' : colors.textPrimary,
+              borderRadius: '9px', fontWeight: '700', fontSize: '14px',
+              border: `1px solid ${modoConductor ? '#f59e0b' : colors.border}`,
+              cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap',
+            }}
+          >
+            📱 {modoConductor ? 'Salir modo 🚚' : 'Modo Chofer'}
+          </button>
+          <button
+            onClick={guardarEnHistorialRecorridos}
+            disabled={guardandoHistorial}
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '9px 18px', backgroundColor: guardandoHistorial ? '#475569' : '#8b5cf6', color: 'white', borderRadius: '9px', fontWeight: '700', fontSize: '14px', border: 'none', cursor: guardandoHistorial ? 'not-allowed' : 'pointer', transition: 'background 120ms ease', whiteSpace: 'nowrap', boxShadow: '0 2px 8px rgba(139,92,246,0.25)' }}
+            onMouseEnter={e => { if (!guardandoHistorial) e.currentTarget.style.backgroundColor = '#7c3aed'; }}
+            onMouseLeave={e => { if (!guardandoHistorial) e.currentTarget.style.backgroundColor = '#8b5cf6'; }}
+          >
+            <CalendarDays size={16} />
+            {guardandoHistorial ? 'Guardando...' : 'Guardar en Historial'}
+          </button>
+        </div>
       </div>
 
       {/* TABS */}
@@ -1537,7 +1556,9 @@ function PantallaRecorridos() {
                     padding: '16px 20px',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '10px',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -1557,36 +1578,119 @@ function PantallaRecorridos() {
                       {datosZona.length} rutas
                     </span>
                   </div>
-                  <button
-                    onClick={() => abrirModal(zona)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      backgroundColor: `${zoneColor}20`,
-                      color: colors.textPrimary,
-                      border: `1px solid ${colors.borderLight}`,
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.backgroundColor = `${zoneColor}40`;
-                      e.target.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.backgroundColor = `${zoneColor}20`;
-                      e.target.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <Plus size={16} strokeWidth={2.5} />
-                    Añadir
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => setZonaAsigMasiva(zonaAsigMasiva === zona ? null : zona)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        backgroundColor: zonaAsigMasiva === zona ? `${zoneColor}30` : `${zoneColor}15`,
+                        color: zoneColor, border: `1px solid ${zoneColor}50`,
+                        padding: '6px 12px', borderRadius: '6px',
+                        fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                      }}
+                      title="Asignar un chofer a todas las rutas de esta zona"
+                    >
+                      👥 Asig. masiva
+                    </button>
+                    <button
+                      onClick={() => abrirModal(zona)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '6px',
+                        backgroundColor: `${zoneColor}20`, color: colors.textPrimary,
+                        border: `1px solid ${colors.borderLight}`,
+                        padding: '6px 12px', borderRadius: '6px',
+                        fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                      }}
+                    >
+                      <Plus size={16} strokeWidth={2.5} /> Añadir
+                    </button>
+                  </div>
                 </div>
 
+                {/* PANEL ASIGNACIÓN MASIVA */}
+                {zonaAsigMasiva === zona && (
+                  <div style={{
+                    padding: '12px 20px', display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap',
+                    background: theme === 'light' ? `${zoneColor}08` : `${zoneColor}12`,
+                    borderBottom: `1px solid ${zoneColor}30`,
+                  }}>
+                    <span style={{ fontSize: '13px', color: colors.textSecondary, fontWeight: '600' }}>
+                      🚚 Asignar chofer a las {datosZona.length} rutas de {zona}:
+                    </span>
+                    <select
+                      value={choferMasivo}
+                      onChange={e => setChoferMasivo(e.target.value)}
+                      style={{
+                        padding: '6px 10px', borderRadius: '8px', fontSize: '13px',
+                        border: `1px solid ${zoneColor}50`, backgroundColor: colors.inputBg,
+                        color: colors.textPrimary, outline: 'none', flex: 1, minWidth: '160px',
+                      }}
+                    >
+                      <option value="">-- Elegir chofer --</option>
+                      {choferes.map(c => (<option key={c.id} value={c.id}>{c.nombre}</option>))}
+                    </select>
+                    <button
+                      onClick={async () => {
+                        if (!choferMasivo) return;
+                        const cid = parseInt(choferMasivo);
+                        await Promise.all(datosZona.map(d => supabase.from(tablaActual).update({ idChofer: cid }).eq('id', d.id)));
+                        setColectasLocales(prev => prev.map(it => it.zona === zona ? { ...it, idChofer: cid } : it));
+                        mostrarToast(`✅ Chofer asignado a ${zona}`, 'success');
+                        setZonaAsigMasiva(null); setChoferMasivo('');
+                      }}
+                      disabled={!choferMasivo}
+                      style={{ padding: '7px 16px', borderRadius: '8px', fontWeight: '700', border: 'none', cursor: choferMasivo ? 'pointer' : 'not-allowed', backgroundColor: choferMasivo ? zoneColor : '#64748b', color: '#fff', opacity: choferMasivo ? 1 : 0.5 }}
+                    >
+                      Confirmar
+                    </button>
+                    <button onClick={() => { setZonaAsigMasiva(null); setChoferMasivo(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: colors.textSecondary, fontSize: '20px', lineHeight: 1 }}>×</button>
+                  </div>
+                )}
+
+                {/* MODO CONDUCTOR */}
+                {modoConductor ? (
+                  <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                    {datosZona.length === 0 ? (
+                      <p style={{ textAlign: 'center', color: colors.textSecondary, padding: '20px', fontSize: '14px' }}>No hay rutas en esta zona</p>
+                    ) : datosZona.map(item => {
+                      const total = (item.pqteDia || 0) + (item.porFuera || 0);
+                      const pct = total > 0 ? Math.round((item.entregados / total) * 100) : 0;
+                      const cnombre = choferes.find(c => c.id === item.idChofer)?.nombre || '—';
+                      return (
+                        <div key={item.id} style={{ backgroundColor: colors.cardBg, border: `2px solid ${pct === 100 ? '#10b981' : zoneColor}40`, borderRadius: '16px', padding: '16px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <div>
+                              <p style={{ margin: 0, fontWeight: '700', fontSize: '16px', color: colors.textPrimary }}>{item.localidad}</p>
+                              <p style={{ margin: '2px 0 0', fontSize: '13px', color: colors.textSecondary }}>🚚 {cnombre} · 📦 {total} pqtes</p>
+                            </div>
+                            <span style={{ fontSize: '22px', fontWeight: '800', color: pct === 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444' }}>{pct}%</span>
+                          </div>
+                          <div style={{ height: '6px', borderRadius: '99px', backgroundColor: colors.border, marginBottom: '14px' }}>
+                            <div style={{ height: '100%', borderRadius: '99px', width: `${pct}%`, backgroundColor: pct === 100 ? '#10b981' : zoneColor, transition: 'width 0.4s ease' }} />
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+                            <button
+                              onClick={() => guardarCambioBD(item.id, 'entregados', Math.max(0, (item.entregados || 0) - 1))}
+                              onPointerDown={e => e.currentTarget.style.transform = 'scale(0.88)'}
+                              onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                              style={{ width: '60px', height: '60px', borderRadius: '50%', fontSize: '32px', border: 'none', backgroundColor: '#ef444422', color: '#ef4444', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s', userSelect: 'none' }}
+                            >−</button>
+                            <div style={{ textAlign: 'center' }}>
+                              <span style={{ fontSize: '36px', fontWeight: '800', color: colors.textPrimary }}>{item.entregados || 0}</span>
+                              <p style={{ margin: 0, fontSize: '11px', color: colors.textSecondary }}>entregados</p>
+                            </div>
+                            <button
+                              onClick={() => guardarCambioBD(item.id, 'entregados', Math.min(total, (item.entregados || 0) + 1))}
+                              onPointerDown={e => e.currentTarget.style.transform = 'scale(0.88)'}
+                              onPointerUp={e => e.currentTarget.style.transform = 'scale(1)'}
+                              style={{ width: '60px', height: '60px', borderRadius: '50%', fontSize: '32px', border: 'none', backgroundColor: '#10b98122', color: '#10b981', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'transform 0.1s', userSelect: 'none' }}
+                            >+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (<>
                 {/* TABLA */}
                 <div style={{ overflow: 'hidden' }}>
                   {datosZona.length > 0 ? (
@@ -1785,6 +1889,7 @@ function PantallaRecorridos() {
                     </div>
                   )}
                 </div>
+                </>)}
               </div>
             );
           })}
